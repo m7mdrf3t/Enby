@@ -1,0 +1,194 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &3757792658912419302
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 499107212807700209}
+  - component: {fileID: 1943421650254836133}
+  - component: {fileID: 6324872712472154439}
+  - component: {fileID: 8469725654616651414}
+  - component: {fileID: 6405210031008382500}
+  - component: {fileID: 7150083046392425682}
+  - component: {fileID: 1829517860158503194}
+  - component: {fileID: 5073113914368529368}
+  - component: {fileID: 352924354657705339}
+  - component: {fileID: 6628943772843310153}
+  m_Layer: 0
+  m_Name: Manager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &499107212807700209
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3757792658912419302}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 2.7423937, y: -0.45068288, z: -3.1410534}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1943421650254836133
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3757792658912419302}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 66b149a8508e4014aa8141a0e33e488a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _autoStartInPlayMode: 1
+--- !u!114 &6324872712472154439
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3757792658912419302}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ee96deb9222a78c4097c92b21e9a3f32, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _spawnConfig: {fileID: 11400000, guid: b466bc0105bc73e42b87a4100b0c2e13, type: 2}
+  _shipConfig: {fileID: 11400000, guid: 50d1138b2b577eb44b86cd840249a44e, type: 2}
+  _shipPrefab: {fileID: 6473990071304540988, guid: 8e7d82ba4a4eaa34b91a7ec82a7389a3, type: 3}
+  _poolParent: {fileID: 0}
+--- !u!114 &8469725654616651414
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3757792658912419302}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8477addbf86a2764aad7969aec04663e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _config: {fileID: 11400000, guid: f52189c06f5af314284757001d71917e, type: 2}
+  _maxCapacity: 1000
+  _startFillRatio: 0.5
+  _baseConsumptionRate: 5
+  _consumptionTickInterval: 0.98
+--- !u!114 &6405210031008382500
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3757792658912419302}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c6fe733118141a74090320bb96c2a4a1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _sockets:
+  - {fileID: 0}
+  - {fileID: 0}
+  _departurePoint: {fileID: 0}
+--- !u!114 &7150083046392425682
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3757792658912419302}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cbb5747b8e553a146983de37d472b27c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _config: {fileID: 11400000, guid: e13fad0ee4c3c70418fc9bce6ecf675d, type: 2}
+--- !u!114 &1829517860158503194
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3757792658912419302}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: df92cea912a289a4b95ba180b05483e9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _hudPanel: {fileID: 0}
+  _pausePanel: {fileID: 0}
+  _gameOverPanel: {fileID: 0}
+  _mainMenuPanel: {fileID: 0}
+  _blackoutOverlay: {fileID: 0}
+  _blackoutFadeDuration: 1.2
+  _storageBarUI: {fileID: 0}
+  _cityStatusUI: {fileID: 0}
+--- !u!114 &5073113914368529368
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3757792658912419302}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f9c39e360fcceab45b44fde1f0504d8e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _camera: {fileID: 0}
+--- !u!114 &352924354657705339
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3757792658912419302}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6fb7ffe83c17a814ab69f0684fdee59c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _homePoints:
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  _storageLoadPoint: {fileID: 0}
+  _townUnloadPoint: {fileID: 0}
+  _toStorageWaypoints:
+  - {fileID: 0}
+  - {fileID: 0}
+  _toTownWaypoints:
+  - {fileID: 0}
+  - {fileID: 0}
+  _returnWaypoints:
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+--- !u!114 &6628943772843310153
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3757792658912419302}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4ecf6a5ab03f5414d939d7b65c0f17cd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _fanConfig: {fileID: 11400000, guid: 990842226daa6e644b9f1dd38d8ccb21, type: 2}
+  _fanPrefab: {fileID: 910400181835803256, guid: e4a6ffbc77a67cc49a1637dfffb34510, type: 3}
+  _poolParent: {fileID: 0}
