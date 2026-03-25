@@ -138,7 +138,10 @@ namespace PetroCitySimulator.Managers
             }
 
             int shipId = _nextShipId++;
-            float cargo = _shipConfig.GetRandomCargo();
+            ShipCargoType cargoType = _shipConfig.GetRandomCargoType();
+            float cargo = cargoType == ShipCargoType.ExportProducts
+                ? _shipConfig.GetRandomExportAmount()
+                : _shipConfig.GetRandomCargo();
             Vector3 spawnPos = _spawnConfig.GetSpawnPosition();
             Vector3 idlePos = _spawnConfig.GetIdlePosition();
             Vector3 departure = _spawnConfig.GetDepartureTarget(spawnPos.y);
@@ -146,6 +149,7 @@ namespace PetroCitySimulator.Managers
             ship.Initialise(
                 shipId: shipId,
                 cargoAmount: cargo,
+                cargoType: cargoType,
                 spawnPosition: spawnPos,
                 idleAnchor: idlePos,
                 departureTarget: departure,
@@ -154,7 +158,7 @@ namespace PetroCitySimulator.Managers
             _activeShips[shipId] = ship;
             _idleShipIds.Add(shipId);
 
-            Debug.Log($"[ShipSpawnManager] Spawned ship {shipId} | cargo: {cargo:F1} | " +
+            Debug.Log($"[ShipSpawnManager] Spawned ship {shipId} ({cargoType}) | cargo: {cargo:F1} | " +
                       $"pool in use: {_pool.InUseCount}/{_pool.TotalCount}");
         }
 

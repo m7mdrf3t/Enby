@@ -67,10 +67,20 @@ namespace PetroCitySimulator.Managers
         /// <summary>Returns true if at least one socket is available.</summary>
         public bool HasAvailableSocket => GetFirstAvailableSocket() != null;
 
+        /// <summary>Returns true if at least one compatible socket is available for this cargo type.</summary>
+        public bool HasAvailableSocketFor(ShipCargoType cargoType) =>
+            GetFirstAvailableSocketFor(cargoType) != null;
+
         /// <summary>Returns the world position of the first available socket, or Vector3.zero.</summary>
         public Vector3 GetAvailableSocketPosition()
         {
             var socket = GetFirstAvailableSocket();
+            return socket != null ? socket.WorldPosition : Vector3.zero;
+        }
+
+        public Vector3 GetAvailableSocketPosition(ShipCargoType cargoType)
+        {
+            var socket = GetFirstAvailableSocketFor(cargoType);
             return socket != null ? socket.WorldPosition : Vector3.zero;
         }
 
@@ -89,11 +99,11 @@ namespace PetroCitySimulator.Managers
                 return;
             }
 
-            // Find a free socket
-            var socket = GetFirstAvailableSocket();
+            // Find a compatible free socket
+            var socket = GetFirstAvailableSocketFor(e.ShipController.CargoType);
             if (socket == null)
             {
-                Debug.Log("[ShoreManager] All sockets busy — tap ignored.");
+                Debug.Log($"[ShoreManager] No compatible free socket for ship {e.ShipId} ({e.ShipController.CargoType}) — tap ignored.");
                 // TODO: Play a "busy" feedback sound/animation here
                 return;
             }
@@ -142,6 +152,16 @@ namespace PetroCitySimulator.Managers
             foreach (var socket in _sockets)
             {
                 if (socket != null && socket.IsAvailable)
+                    return socket;
+            }
+            return null;
+        }
+
+        private SocketController GetFirstAvailableSocketFor(ShipCargoType cargoType)
+        {
+            foreach (var socket in _sockets)
+            {
+                if (socket != null && socket.IsAvailable && socket.CanAcceptCargoType(cargoType))
                     return socket;
             }
             return null;

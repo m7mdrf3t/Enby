@@ -21,6 +21,9 @@ namespace PetroCitySimulator.Events
 
         /// <summary>How much gas cargo this ship is carrying (units).</summary>
         public float CargoAmount;
+
+        /// <summary>Whether this ship imports gas or exports products.</summary>
+        public Entities.Ship.ShipCargoType CargoType;
     }
 
     /// <summary>
@@ -44,6 +47,7 @@ namespace PetroCitySimulator.Events
         public int ShipId;
         public int SocketIndex;
         public float CargoAmount;
+        public Entities.Ship.ShipCargoType CargoType;
 
         /// <summary>How many seconds the ship will stay docked.</summary>
         public float DockDuration;
@@ -60,6 +64,27 @@ namespace PetroCitySimulator.Events
 
         /// <summary>Actual gas units transferred this visit.</summary>
         public float AmountDelivered;
+    }
+
+    /// <summary>
+    /// Raised when an export ship loads products from product storage and departs.
+    /// </summary>
+    public struct OnProductsExported
+    {
+        public int ShipId;
+        public int SocketIndex;
+        public float AmountExported;
+    }
+
+    /// <summary>
+    /// Raised by SocketController when an export ship is ready to load products.
+    /// ProductStorageManager handles the request and raises OnProductsExported.
+    /// </summary>
+    public struct OnProductExportRequested
+    {
+        public int ShipId;
+        public int SocketIndex;
+        public float RequestedAmount;
     }
 
     /// <summary>
@@ -195,6 +220,9 @@ namespace PetroCitySimulator.Events
 
         /// <summary>Gas units that will be transferred by this fan activation.</summary>
         public float TransferAmount;
+
+        /// <summary>Where this fan route is heading after loading.</summary>
+        public Managers.FanRouteTarget RouteTarget;
     }
 
     /// <summary>
@@ -205,6 +233,20 @@ namespace PetroCitySimulator.Events
     {
         public int FanId;
         public float AmountTransferred;
+
+        /// <summary>Where this fan route unloaded.</summary>
+        public Managers.FanRouteTarget RouteTarget;
+    }
+
+    /// <summary>
+    /// Raised when a factory receives gas input from a fan.
+    /// FactoryManager listens and converts this into production.
+    /// </summary>
+    public struct OnFactoryGasDelivered
+    {
+        public int FactoryId;
+        public int FanId;
+        public float GasAmount;
     }
 
 
@@ -252,6 +294,15 @@ namespace PetroCitySimulator.Events
     }
 
     /// <summary>
+    /// Raised by InputManager when a factory is tapped.
+    /// FactoryManager listens and requests a fan dispatch.
+    /// </summary>
+    public struct OnFactoryTapped
+    {
+        public int FactoryId;
+    }
+
+    /// <summary>
     /// Raised by FanController the moment a fan is activated.
     /// StorageManager listens and immediately drains the requested amount.
     /// Separate from OnFanActivated so storage deduction is synchronous
@@ -261,5 +312,29 @@ namespace PetroCitySimulator.Events
     {
         public int FanId;
         public float TransferAmount;
+    }
+
+    // ----------------------------------------------------------
+    //  PRODUCT / ECONOMY EVENTS
+    // ----------------------------------------------------------
+
+    /// <summary>
+    /// Raised whenever product storage amount changes.
+    /// </summary>
+    public struct OnProductStorageChanged
+    {
+        public float CurrentAmount;
+        public float MaxCapacity;
+        public float FillRatio;
+    }
+
+    /// <summary>
+    /// Raised when total money changes due to product exports.
+    /// </summary>
+    public struct OnMoneyChanged
+    {
+        public float CurrentMoney;
+        public float Delta;
+        public string Source;
     }
 }

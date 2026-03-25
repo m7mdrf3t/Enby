@@ -14,6 +14,7 @@
 using UnityEngine;
 using PetroCitySimulator.Data;
 using PetroCitySimulator.Events;
+using TMPro;
 
 namespace PetroCitySimulator.Entities.Ship
 {
@@ -28,6 +29,18 @@ namespace PetroCitySimulator.Entities.Ship
         [Tooltip("Visual root to apply bob animation to (can be a child transform).")]
         [SerializeField] private Transform _visualRoot;
 
+        [Tooltip("Optional renderer used to tint ship role (import/export).")]
+        [SerializeField] private Renderer _roleRenderer;
+
+        [Tooltip("Optional world-space label that shows IMPORT / EXPORT.")]
+        [SerializeField] private TMP_Text _roleLabel;
+
+        [Header("Role Colours")]
+        [SerializeField] private Color _importColor = new Color(0.35f, 0.75f, 1f);
+        [SerializeField] private Color _exportColor = new Color(1f, 0.65f, 0.25f);
+        [SerializeField] private Color _importLabelColor = new Color(0.65f, 0.9f, 1f);
+        [SerializeField] private Color _exportLabelColor = new Color(1f, 0.85f, 0.45f);
+
         [Header("Config — assign ShipConfigSO asset")]
         [SerializeField] private ShipConfigSO _config;
 
@@ -37,6 +50,7 @@ namespace PetroCitySimulator.Entities.Ship
 
         public int ShipId { get; private set; }
         public float CargoAmount { get; private set; }
+        public ShipCargoType CargoType { get; private set; } = ShipCargoType.ImportGas;
 
         private int _assignedSocketIndex = -1;
         private Vector3 _socketWorldPosition;
@@ -56,6 +70,7 @@ namespace PetroCitySimulator.Entities.Ship
 
         private float _bobTimer;
         private float _originalVisualY;   // local Y of _visualRoot at rest
+        private Camera _mainCamera;
 
         // ---------------------------------------------------
         //  Unity lifecycle
@@ -68,6 +83,8 @@ namespace PetroCitySimulator.Entities.Ship
 
             if (_visualRoot == null)
                 _visualRoot = transform;
+
+            _mainCamera = Camera.main;
         }
 
         private void OnEnable()
@@ -92,6 +109,8 @@ namespace PetroCitySimulator.Entities.Ship
                 case ShipState.Departing: UpdateDeparting(); break;
                     // Docked and Despawned have no per-frame logic here
             }
+
+                    UpdateRoleLabelFacing();
         }
 
         // ---------------------------------------------------
@@ -105,6 +124,7 @@ namespace PetroCitySimulator.Entities.Ship
         public void Initialise(
             int shipId,
             float cargoAmount,
+            ShipCargoType cargoType,
             Vector3 spawnPosition,
             Vector3 idleAnchor,
             Vector3 departureTarget,
@@ -114,6 +134,7 @@ namespace PetroCitySimulator.Entities.Ship
 
             ShipId = shipId;
             CargoAmount = cargoAmount;
+            CargoType = cargoType;
 
             _idleAnchor = idleAnchor;
             _departureTarget = departureTarget;
@@ -124,12 +145,15 @@ namespace PetroCitySimulator.Entities.Ship
 
             _assignedSocketIndex = -1;
 
+            UpdateRoleVisual();
+
             _fsm.Reset();   // → ShipState.Spawning
 
             EventBus<OnShipSpawned>.Raise(new OnShipSpawned
             {
                 ShipId = ShipId,
-                CargoAmount = CargoAmount
+                CargoAmount = CargoAmount,
+                CargoType = CargoType
             });
         }
 
@@ -225,6 +249,7 @@ namespace PetroCitySimulator.Entities.Ship
                     ShipId = ShipId,
                     SocketIndex = _assignedSocketIndex,
                     CargoAmount = CargoAmount,
+                    CargoType = CargoType,
                     DockDuration = _config.DockDuration
                 });
             }
@@ -289,6 +314,38 @@ namespace PetroCitySimulator.Entities.Ship
         {
             var lp = _visualRoot.localPosition;
             _visualRoot.localPosition = new Vector3(lp.x, _originalVisualY, lp.z);
+        }
+
+        private void UpdateRoleVisual()
+        {
+            if (_roleRenderer == null) return;
+
+            _roleRenderer.material.color = CargoType == ShipCargoType.ExportProducts
+                ? _exportColor
+                : _importColor;
+
+            if (_roleLabel != null)
+            {
+                bool isExport = CargoType == ShipCargoType.ExportProducts;
+                _roleLabel.text = isExport ? "EXPORT" : "IMPORT";
+                _roleLabel.color = isExport ? _exportLabelColor : _importLabelColor;
+                _roleLabel.gameObject.SetActive(true);
+            }
+        }
+
+        private void UpdateRoleLabelFacing()
+        {
+            if (_roleLabel == null) return;
+
+            if (_mainCamera == null)
+                _mainCamera = Camera.main;
+
+            if (_mainCamera == null) return;
+
+            Transform labelTransform = _roleLabel.transform;
+            Vector3 toCamera = labelTransform.position - _mainCamera.transform.position;
+            if (toCamera.sqrMagnitude > 0.001f)
+                labelTransform.rotation = Quaternion.LookRotation(toCamera.normalized, Vector3.up);
         }
     }
 }

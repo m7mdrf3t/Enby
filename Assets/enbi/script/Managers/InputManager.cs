@@ -1,6 +1,7 @@
 using PetroCitySimulator.Entities.Fan;
 using PetroCitySimulator.Entities.Ship;
 using PetroCitySimulator.Events;
+using PetroCitySimulator.Managers;
 using UnityEngine;
 
 
@@ -42,6 +43,17 @@ public class InputManager : MonoBehaviour
             if (fan != null)
             {
                 fan.TryActivate();
+                return;
+            }
+
+            // Factory tapped?
+            var factory = hit.collider.GetComponentInParent<FactoryTapTarget>();
+            if (factory != null)
+            {
+                EventBus<OnFactoryTapped>.Raise(new OnFactoryTapped
+                {
+                    FactoryId = factory.FactoryId
+                });
             }
         }
     }

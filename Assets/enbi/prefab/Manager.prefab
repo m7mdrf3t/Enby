@@ -18,6 +18,8 @@ GameObject:
   - component: {fileID: 5073113914368529368}
   - component: {fileID: 352924354657705339}
   - component: {fileID: 6628943772843310153}
+  - component: {fileID: 5378940491431401162}
+  - component: {fileID: 7278535897547246472}
   m_Layer: 0
   m_Name: Manager
   m_TagString: Untagged
@@ -166,12 +168,14 @@ MonoBehaviour:
   - {fileID: 0}
   _storageLoadPoint: {fileID: 0}
   _townUnloadPoint: {fileID: 0}
+  _factoryUnloadPoint: {fileID: 0}
   _toStorageWaypoints:
   - {fileID: 0}
   - {fileID: 0}
   _toTownWaypoints:
   - {fileID: 0}
   - {fileID: 0}
+  _toFactoryWaypoints: []
   _returnWaypoints:
   - {fileID: 0}
   - {fileID: 0}
@@ -192,3 +196,31 @@ MonoBehaviour:
   _fanConfig: {fileID: 11400000, guid: 990842226daa6e644b9f1dd38d8ccb21, type: 2}
   _fanPrefab: {fileID: 910400181835803256, guid: e4a6ffbc77a67cc49a1637dfffb34510, type: 3}
   _poolParent: {fileID: 0}
+--- !u!114 &5378940491431401162
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3757792658912419302}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cde23b5e3ce82fc4787247fb76654816, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _factoryId: 1
+  _config: {fileID: 11400000, guid: 98a973a5eee2a1642848d08d05670344, type: 2}
+--- !u!114 &7278535897547246472
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3757792658912419302}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 65806001d8bd51c4cb08b814912fa020, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _config: {fileID: 11400000, guid: 66a71da3b31fc51498cb546e430084b1, type: 2}
+  _startingMoney: 100

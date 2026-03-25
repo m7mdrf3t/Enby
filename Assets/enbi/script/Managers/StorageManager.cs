@@ -211,8 +211,9 @@ namespace PetroCitySimulator.Managers
 
         private void HandleFanTransferRequested(OnFanTransferRequested e)
         {
-            float drained = DrainGas(e.TransferAmount);
-            Debug.Log($"[StorageManager] Fan {e.FanId} drained {drained:F1} units from storage.");
+            // FanController already drains storage at load completion and
+            // reports the actual loaded amount through this event.
+            Debug.Log($"[StorageManager] Fan {e.FanId} transfer acknowledged: {e.TransferAmount:F1} units.");
         }
 
         private void HandleGameStateChanged(OnGameStateChanged e)

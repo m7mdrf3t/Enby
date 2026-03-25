@@ -9,6 +9,7 @@
 // ============================================================
 
 using UnityEngine;
+using PetroCitySimulator.Entities.Ship;
 
 namespace PetroCitySimulator.Data
 {
@@ -28,6 +29,22 @@ namespace PetroCitySimulator.Data
 
         [Tooltip("Maximum gas units a ship can carry.")]
         [SerializeField, Min(1f)] private float _maxCargoAmount = 200f;
+
+        [Tooltip("Chance that a spawned ship is an export ship (0..1).")]
+        [SerializeField, Range(0f, 1f)] private float _exportShipChance = 0.35f;
+
+        [Tooltip("Minimum product units an export ship can carry.")]
+        [SerializeField, Min(1f)] private float _minExportAmount = 40f;
+
+        [Tooltip("Maximum product units an export ship can carry.")]
+        [SerializeField, Min(1f)] private float _maxExportAmount = 120f;
+
+        [Header("Debug Spawn Overrides")]
+        [Tooltip("If enabled, every spawned ship is forced to export products.")]
+        [SerializeField] private bool _forceExportShips = false;
+
+        [Tooltip("If enabled, every spawned ship is forced to import gas.")]
+        [SerializeField] private bool _forceImportShips = false;
 
         // ---------------------------------------------------
         //  Docking
@@ -74,6 +91,11 @@ namespace PetroCitySimulator.Data
 
         public float MinCargoAmount => _minCargoAmount;
         public float MaxCargoAmount => _maxCargoAmount;
+        public float ExportShipChance => _exportShipChance;
+        public float MinExportAmount => _minExportAmount;
+        public float MaxExportAmount => _maxExportAmount;
+        public bool ForceExportShips => _forceExportShips;
+        public bool ForceImportShips => _forceImportShips;
         public float DockDuration => _dockDuration;
         public float DockSnapDistance => _dockSnapDistance;
         public float DockingSpeed => _dockingSpeed;
@@ -91,10 +113,30 @@ namespace PetroCitySimulator.Data
         public float GetRandomCargo() =>
             Random.Range(_minCargoAmount, _maxCargoAmount);
 
+        public float GetRandomExportAmount() =>
+            Random.Range(_minExportAmount, _maxExportAmount);
+
+        public ShipCargoType GetRandomCargoType()
+        {
+            if (_forceExportShips) return ShipCargoType.ExportProducts;
+            if (_forceImportShips) return ShipCargoType.ImportGas;
+
+            float roll = Random.value;
+            return roll < _exportShipChance
+                ? ShipCargoType.ExportProducts
+                : ShipCargoType.ImportGas;
+        }
+
         private void OnValidate()
         {
             if (_maxCargoAmount < _minCargoAmount)
                 _maxCargoAmount = _minCargoAmount;
+
+            if (_maxExportAmount < _minExportAmount)
+                _maxExportAmount = _minExportAmount;
+
+            if (_forceExportShips && _forceImportShips)
+                _forceImportShips = false;
         }
     }
 }

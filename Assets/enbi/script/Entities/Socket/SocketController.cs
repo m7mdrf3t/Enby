@@ -17,6 +17,13 @@ using PetroCitySimulator.Entities.Ship;
 
 namespace PetroCitySimulator.Entities.Socket
 {
+    public enum SocketCargoMode
+    {
+        Any,
+        ImportOnly,
+        ExportOnly
+    }
+
     public class SocketController : MonoBehaviour
     {
         // ---------------------------------------------------
@@ -30,6 +37,10 @@ namespace PetroCitySimulator.Entities.Socket
         [Header("Dock Settings")]
         [Tooltip("Seconds ship stays docked. Overridden at runtime by ShipConfigSO.DockDuration.")]
         [SerializeField] private float _defaultDockDuration = 20f;
+
+        [Header("Cargo Mode")]
+        [Tooltip("Restrict this socket to import ships, export ships, or allow both.")]
+        [SerializeField] private SocketCargoMode _cargoMode = SocketCargoMode.Any;
 
         [Tooltip("Enable a brief cooldown between ships departing and the socket accepting a new one.")]
         [SerializeField] private bool _enableCooldown = false;
@@ -63,6 +74,7 @@ namespace PetroCitySimulator.Entities.Socket
         public int SocketIndex => _socketIndex;
         public SocketState CurrentState => _fsm?.Current ?? SocketState.Free;
         public bool IsAvailable => _fsm != null && _fsm.IsAvailable;
+        public SocketCargoMode CargoMode => _cargoMode;
         public Vector3 WorldPosition => transform.position;
 
         // ---------------------------------------------------
@@ -118,8 +130,30 @@ namespace PetroCitySimulator.Entities.Socket
                 return;
             }
 
+            if (ship == null || !CanAcceptCargoType(ship.CargoType))
+            {
+                Debug.LogWarning($"[SocketController {_socketIndex}] Incompatible ship cargo type for this socket mode ({_cargoMode}).");
+                return;
+            }
+
             _dockedShip = ship;
             _fsm.TransitionTo(SocketState.Incoming);
+        }
+
+        public bool CanAcceptShip(ShipController ship)
+        {
+            if (ship == null) return false;
+            return IsAvailable && CanAcceptCargoType(ship.CargoType);
+        }
+
+        public bool CanAcceptCargoType(ShipCargoType cargoType)
+        {
+            return _cargoMode switch
+            {
+                SocketCargoMode.ImportOnly => cargoType == ShipCargoType.ImportGas,
+                SocketCargoMode.ExportOnly => cargoType == ShipCargoType.ExportProducts,
+                _ => true
+            };
         }
 
         /// <summary>
@@ -181,15 +215,29 @@ namespace PetroCitySimulator.Entities.Socket
                 return;
             }
 
-            // 1. Publish cargo delivered — StorageManager will pick this up
-            EventBus<OnCargoDelivered>.Raise(new OnCargoDelivered
+            if (_dockedShip.CargoType == ShipCargoType.ExportProducts)
             {
-                ShipId = _dockedShip.ShipId,
-                SocketIndex = _socketIndex,
-                AmountDelivered = _assignedCargo
-            });
+                EventBus<OnProductExportRequested>.Raise(new OnProductExportRequested
+                {
+                    ShipId = _dockedShip.ShipId,
+                    SocketIndex = _socketIndex,
+                    RequestedAmount = _assignedCargo
+                });
 
-            Debug.Log($"[SocketController {_socketIndex}] Cargo delivered: {_assignedCargo:F1} units.");
+                Debug.Log($"[SocketController {_socketIndex}] Export request sent: {_assignedCargo:F1} units.");
+            }
+            else
+            {
+                // Import path: deliver gas into main storage
+                EventBus<OnCargoDelivered>.Raise(new OnCargoDelivered
+                {
+                    ShipId = _dockedShip.ShipId,
+                    SocketIndex = _socketIndex,
+                    AmountDelivered = _assignedCargo
+                });
+
+                Debug.Log($"[SocketController {_socketIndex}] Cargo delivered: {_assignedCargo:F1} units.");
+            }
 
             // 2. Tell the ship to depart
             _dockedShip.BeginDeparture();
@@ -275,7 +323,7 @@ namespace PetroCitySimulator.Entities.Socket
             Gizmos.DrawWireSphere(transform.position, 0.4f);
             UnityEditor.Handles.Label(
                 transform.position + Vector3.up * 0.6f,
-                $"Socket {_socketIndex}\n{_fsm.Current}");
+                $"Socket {_socketIndex}\n{_fsm.Current}\n{_cargoMode}");
         }
 #endif
     }
