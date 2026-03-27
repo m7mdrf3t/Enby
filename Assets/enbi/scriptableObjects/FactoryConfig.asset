@@ -12,6 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c8cd173937b7d954788d7609da1afb5b, type: 3}
   m_Name: FactoryConfig
   m_EditorClassIdentifier: 
-  _productionDuration: 4
+  _productionDuration: 5
   _gasPerProduct: 25
-  _productsPerCycle: 1
+  _productsPerCycle: 2
+  _gasBufferCapacity: 200
+  _gasTransferPerPress: 50

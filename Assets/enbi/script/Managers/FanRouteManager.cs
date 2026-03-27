@@ -4,12 +4,6 @@ using UnityEngine;
 
 namespace PetroCitySimulator.Managers
 {
-    public enum FanRouteTarget
-    {
-        Town,
-        Factory
-    }
-
     public class FanRouteManager : MonoBehaviour
     {
         public static FanRouteManager Instance { get; private set; }
@@ -17,28 +11,21 @@ namespace PetroCitySimulator.Managers
         [Header("Home Points")]
         [SerializeField] private List<Transform> _homePoints = new List<Transform>();
 
-        [Header("Shared Route Points")]
-        [SerializeField] private Transform _storageLoadPoint;
-        [SerializeField] private Transform _townUnloadPoint;
-        [SerializeField] private Transform _factoryUnloadPoint;
-
-        [Header("Waypoints")]
-        [SerializeField] private List<Transform> _toStorageWaypoints = new List<Transform>();
-        [SerializeField] private List<Transform> _toTownWaypoints = new List<Transform>();
-        [SerializeField] private List<Transform> _toFactoryWaypoints = new List<Transform>();
-        [SerializeField] private List<Transform> _returnWaypoints = new List<Transform>();
+        [Header("Route Points")]
+        [Tooltip("Where fans pick up products (at the factory output).")]
+        [SerializeField] private Transform _factoryLoadPoint;
+        [Tooltip("Intermediate points the fan travels through (in order) between factory and storage.")]
+        [SerializeField] private List<Transform> _routeWaypoints = new List<Transform>();
+        [Tooltip("Where fans deliver products (at the product storage).")]
+        [SerializeField] private Transform _productStoragePoint;
 
         // Storage queue: fans waiting to load, or actively loading
         private readonly Queue<FanController> _storageQueue = new Queue<FanController>();
         private FanController _fanLoadingAtStorage;
 
-        // Town queue: similar to storage
+        // Delivery queue: fans waiting to unload at product storage
         private readonly Queue<FanController> _townQueue = new Queue<FanController>();
         private FanController _fanUnloadingAtTown;
-
-        // Factory queue: one-at-a-time unload at factory point
-        private readonly Queue<FanController> _factoryQueue = new Queue<FanController>();
-        private FanController _fanUnloadingAtFactory;
 
         // Home slot tracking: maps each fan to its assigned home point index
         private readonly Dictionary<FanController, int> _fanHomeSlots = new Dictionary<FanController, int>();
@@ -56,18 +43,8 @@ namespace PetroCitySimulator.Managers
             // Debug: Log the route manager state
             Debug.Log($"[FanRouteManager] Initialized:");
             Debug.Log($"  Home Points: {_homePoints.Count} total");
-            for (int i = 0; i < _homePoints.Count; i++)
-            {
-                Debug.Log($"    [{i}] {(_homePoints[i] != null ? _homePoints[i].name : "NULL")}");
-            }
-            Debug.Log($"  Storage Load Point: {(_storageLoadPoint != null ? _storageLoadPoint.name : "NOT ASSIGNED")}");
-            Debug.Log($"  Town Unload Point: {(_townUnloadPoint != null ? _townUnloadPoint.name : "NOT ASSIGNED")}");
-            Debug.Log($"  Factory Unload Point: {(_factoryUnloadPoint != null ? _factoryUnloadPoint.name : "NOT ASSIGNED")}");
-            Debug.Log($"  To Storage Waypoints: {_toStorageWaypoints.Count}");
-            Debug.Log($"  To Town Waypoints: {_toTownWaypoints.Count}");
-            Debug.Log($"  To Factory Waypoints: {_toFactoryWaypoints.Count}");
-            Debug.Log($"  Return Waypoints: {_returnWaypoints.Count}");
-            Debug.Log($"  Queue-based routing enabled: Multiple fans can move concurrently");
+            Debug.Log($"  Pickup Point: {(_factoryLoadPoint != null ? _factoryLoadPoint.name : "NOT ASSIGNED")}");
+            Debug.Log($"  Dropoff Point: {(_productStoragePoint != null ? _productStoragePoint.name : "NOT ASSIGNED")}");
             Debug.Log($"  HasAvailableHomePoint: {HasAvailableHomePoint}");
         }
 
@@ -101,49 +78,34 @@ namespace PetroCitySimulator.Managers
 
         public bool TryBeginRoute(
             FanController fan,
-            out Vector3[] toStoragePath,
-            out Vector3[] toTownPath,
+            out Vector3[] toPickupPath,
+            out Vector3[] toDropoffPath,
             out Vector3[] returnPath)
         {
-            return TryBeginRoute(fan, FanRouteTarget.Town, out toStoragePath, out toTownPath, out returnPath);
-        }
-
-        public bool TryBeginRoute(
-            FanController fan,
-            FanRouteTarget target,
-            out Vector3[] toStoragePath,
-            out Vector3[] toDestinationPath,
-            out Vector3[] returnPath)
-        {
-            toStoragePath = System.Array.Empty<Vector3>();
-            toDestinationPath = System.Array.Empty<Vector3>();
+            toPickupPath = System.Array.Empty<Vector3>();
+            toDropoffPath = System.Array.Empty<Vector3>();
             returnPath = System.Array.Empty<Vector3>();
 
-            if (fan == null || _storageLoadPoint == null)
-                return false;
-
-            if (target == FanRouteTarget.Town && _townUnloadPoint == null)
-                return false;
-
-            if (target == FanRouteTarget.Factory && _factoryUnloadPoint == null)
+            if (fan == null || _factoryLoadPoint == null || _productStoragePoint == null)
                 return false;
 
             if (!_fanHomeSlots.ContainsKey(fan))
                 return false;
 
-            // Multiple fans allowed — just provide the paths
-            toStoragePath = BuildPath(_toStorageWaypoints, _storageLoadPoint.position);
+            // Build forward path: factory → waypoints → product storage
+            var forward = new System.Collections.Generic.List<Vector3>();
+            forward.Add(_factoryLoadPoint.position);
+            foreach (var wp in _routeWaypoints)
+                if (wp != null) forward.Add(wp.position);
+            forward.Add(_productStoragePoint.position);
 
-            toDestinationPath = target == FanRouteTarget.Factory
-                ? BuildPath(_toFactoryWaypoints, _factoryUnloadPoint.position)
-                : BuildPath(_toTownWaypoints, _townUnloadPoint.position);
+            toPickupPath  = new[] { _factoryLoadPoint.position };
+            toDropoffPath = forward.ToArray();
+            returnPath    = System.Array.Empty<Vector3>();
 
-            returnPath = BuildPath(_returnWaypoints);
-            
-            // Add to storage queue when beginning route
             if (!_storageQueue.Contains(fan))
                 _storageQueue.Enqueue(fan);
-            
+
             return true;
         }
 
@@ -163,14 +125,6 @@ namespace PetroCitySimulator.Managers
                 _townQueue.Dequeue();
                 if (_fanUnloadingAtTown == fan)
                     _fanUnloadingAtTown = null;
-            }
-
-            // Remove from factory queue if still in it
-            if (_factoryQueue.Count > 0 && _factoryQueue.Peek() == fan)
-            {
-                _factoryQueue.Dequeue();
-                if (_fanUnloadingAtFactory == fan)
-                    _fanUnloadingAtFactory = null;
             }
         }
 
@@ -223,21 +177,15 @@ namespace PetroCitySimulator.Managers
             if (!_townQueue.Contains(fan))
             {
                 _townQueue.Enqueue(fan);
-                Debug.Log($"[FanRouteManager] Fan {fan.FanId} added to town queue. Queue size: {_townQueue.Count}");
+                Debug.Log($"[FanRouteManager] Fan {fan.FanId} added to delivery queue. Queue size: {_townQueue.Count}");
             }
         }
 
-        /// <summary>
-        /// Check if this fan is next in line to unload at town.
-        /// </summary>
         public bool IsNextInTownQueue(FanController fan)
         {
             return _townQueue.Count > 0 && _townQueue.Peek() == fan && _fanUnloadingAtTown == null;
         }
 
-        /// <summary>
-        /// Called by FanController when it reaches town and is ready to unload.
-        /// </summary>
         public bool TryBeginTownUnload(FanController fan)
         {
             if (!IsNextInTownQueue(fan))
@@ -245,35 +193,6 @@ namespace PetroCitySimulator.Managers
 
             _fanUnloadingAtTown = fan;
             return true;
-        }
-
-        public void EnqueueForFactoryUnload(FanController fan)
-        {
-            if (!_factoryQueue.Contains(fan))
-                _factoryQueue.Enqueue(fan);
-        }
-
-        public bool TryBeginFactoryUnload(FanController fan)
-        {
-            bool canUnload = _factoryQueue.Count > 0 &&
-                             _factoryQueue.Peek() == fan &&
-                             _fanUnloadingAtFactory == null;
-
-            if (!canUnload)
-                return false;
-
-            _fanUnloadingAtFactory = fan;
-            return true;
-        }
-
-        public void EndFactoryUnload(FanController fan)
-        {
-            if (_fanUnloadingAtFactory == fan)
-            {
-                _fanUnloadingAtFactory = null;
-                if (_factoryQueue.Count > 0 && _factoryQueue.Peek() == fan)
-                    _factoryQueue.Dequeue();
-            }
         }
 
         /// <summary>
@@ -291,22 +210,6 @@ namespace PetroCitySimulator.Managers
 
         public bool HasAvailableHomePoint => _fanHomeSlots.Count < _homePoints.Count;
 
-        private static Vector3[] BuildPath(List<Transform> waypoints, params Vector3[] finalPoints)
-        {
-            var points = new List<Vector3>(waypoints.Count + finalPoints.Length);
-
-            foreach (var waypoint in waypoints)
-            {
-                if (waypoint != null)
-                    points.Add(waypoint.position);
-            }
-
-            for (int i = 0; i < finalPoints.Length; i++)
-                points.Add(finalPoints[i]);
-
-            return points.ToArray();
-        }
-
         private void OnDestroy()
         {
             if (Instance == this)
@@ -316,45 +219,39 @@ namespace PetroCitySimulator.Managers
 #if UNITY_EDITOR
         private void OnDrawGizmos()
         {
-            DrawPath(_homePoints, Color.white, "Home");
-            DrawPath(_toStorageWaypoints, new Color(0.3f, 0.8f, 1f), "To Storage");
-            DrawPath(_toTownWaypoints, new Color(1f, 0.7f, 0.2f), "To Town");
-            DrawPath(_toFactoryWaypoints, new Color(1f, 0.4f, 0.4f), "To Factory");
-            DrawPath(_returnWaypoints, new Color(0.8f, 0.4f, 1f), "Return");
+            // Home points
+            Gizmos.color = Color.white;
+            foreach (var hp in _homePoints)
+            {
+                if (hp != null)
+                    Gizmos.DrawWireSphere(hp.position, 0.18f);
+            }
 
-            if (_storageLoadPoint != null)
+            if (_factoryLoadPoint != null)
             {
                 Gizmos.color = Color.cyan;
-                Gizmos.DrawSphere(_storageLoadPoint.position, 0.2f);
+                Gizmos.DrawSphere(_factoryLoadPoint.position, 0.2f);
+                UnityEditor.Handles.Label(_factoryLoadPoint.position + Vector3.up * 0.3f, "Factory Load");
             }
 
-            if (_townUnloadPoint != null)
+            // In-between waypoints
+            Gizmos.color = new Color(0.6f, 1f, 0.6f);
+            Vector3 prev = _factoryLoadPoint != null ? _factoryLoadPoint.position : Vector3.zero;
+            foreach (var wp in _routeWaypoints)
+            {
+                if (wp == null) continue;
+                Gizmos.DrawWireSphere(wp.position, 0.15f);
+                Gizmos.DrawLine(prev, wp.position);
+                prev = wp.position;
+            }
+
+            if (_productStoragePoint != null)
             {
                 Gizmos.color = Color.yellow;
-                Gizmos.DrawSphere(_townUnloadPoint.position, 0.2f);
-            }
-
-            if (_factoryUnloadPoint != null)
-            {
-                Gizmos.color = Color.red;
-                Gizmos.DrawSphere(_factoryUnloadPoint.position, 0.2f);
-            }
-        }
-
-        private static void DrawPath(List<Transform> waypoints, Color color, string label)
-        {
-            Gizmos.color = color;
-
-            for (int i = 0; i < waypoints.Count; i++)
-            {
-                var waypoint = waypoints[i];
-                if (waypoint == null) continue;
-
-                Gizmos.DrawWireSphere(waypoint.position, 0.18f);
-                UnityEditor.Handles.Label(waypoint.position + Vector3.up * 0.25f, $"{label} {i}");
-
-                if (i + 1 < waypoints.Count && waypoints[i + 1] != null)
-                    Gizmos.DrawLine(waypoint.position, waypoints[i + 1].position);
+                Gizmos.DrawSphere(_productStoragePoint.position, 0.2f);
+                UnityEditor.Handles.Label(_productStoragePoint.position + Vector3.up * 0.3f, "Product Storage");
+                if (_routeWaypoints.Count > 0)
+                    Gizmos.DrawLine(prev, _productStoragePoint.position);
             }
         }
 #endif

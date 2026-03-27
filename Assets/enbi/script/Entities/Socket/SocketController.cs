@@ -14,6 +14,7 @@ using UnityEngine;
 using PetroCitySimulator.Events;
 using PetroCitySimulator.Utils;
 using PetroCitySimulator.Entities.Ship;
+using PetroCitySimulator.Managers;
 
 namespace PetroCitySimulator.Entities.Socket
 {
@@ -217,14 +218,23 @@ namespace PetroCitySimulator.Entities.Socket
 
             if (_dockedShip.CargoType == ShipCargoType.ExportProducts)
             {
-                EventBus<OnProductExportRequested>.Raise(new OnProductExportRequested
+                if (ProductStorageManager.Instance != null)
                 {
-                    ShipId = _dockedShip.ShipId,
-                    SocketIndex = _socketIndex,
-                    RequestedAmount = _assignedCargo
-                });
+                    ProductStorageManager.Instance.ExportProducts(_dockedShip.ShipId, _socketIndex, _assignedCargo);
+                    Debug.Log($"[SocketController {_socketIndex}] Export processed: {_assignedCargo:F1} requested units.");
+                }
+                else
+                {
+                    // Fallback to event-driven export path if manager lookup fails.
+                    EventBus<OnProductExportRequested>.Raise(new OnProductExportRequested
+                    {
+                        ShipId = _dockedShip.ShipId,
+                        SocketIndex = _socketIndex,
+                        RequestedAmount = _assignedCargo
+                    });
 
-                Debug.Log($"[SocketController {_socketIndex}] Export request sent: {_assignedCargo:F1} units.");
+                    Debug.LogWarning($"[SocketController {_socketIndex}] ProductStorageManager missing, raised export request event instead.");
+                }
             }
             else
             {

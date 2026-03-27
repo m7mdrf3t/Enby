@@ -84,6 +84,19 @@ namespace PetroCitySimulator.Managers
             });
         }
 
+        public bool CanAfford(float amount) => _currentMoney >= amount;
+
+        public bool SpendMoney(float amount, string source)
+        {
+            if (amount <= 0f) return true;
+            if (_currentMoney < amount) return false;
+
+            _currentMoney -= amount;
+            PublishMoneyChanged(-amount, source);
+            Debug.Log($"[MoneyManager] -{amount:F1} money ({source}). Remaining: {_currentMoney:F1}");
+            return true;
+        }
+
         private void OnDestroy()
         {
             if (Instance == this)

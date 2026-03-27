@@ -16,9 +16,9 @@ MonoBehaviour:
   _loadDuration: 2
   _unloadDuration: 2
   _minimumStorageThreshold: 10
-  _moveToStorageSpeed: 4
-  _moveToTownSpeed: 4
-  _returnSpeed: 5
+  _moveToStorageSpeed: 400
+  _moveToTownSpeed: 400
+  _returnSpeed: 400
   _snapDistance: 0.35
   _initialSpawnDelay: 0
   _spawnInterval: 2

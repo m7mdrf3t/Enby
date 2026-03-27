@@ -60,6 +60,10 @@ namespace PetroCitySimulator.Managers
         private readonly Dictionary<int, ShipController> _activeShips
             = new Dictionary<int, ShipController>();
 
+        /// <summary>Live counts per cargo type — kept equal at all times.</summary>
+        private int _activeImportCount;
+        private int _activeExportCount;
+
         // ---------------------------------------------------
         //  Unity lifecycle
         // ---------------------------------------------------
@@ -138,13 +142,23 @@ namespace PetroCitySimulator.Managers
             }
 
             int shipId = _nextShipId++;
-            ShipCargoType cargoType = _shipConfig.GetRandomCargoType();
+
+            // Keep Import and Export counts balanced: spawn whichever type is behind.
+            // If equal, fall back to the configured random chance.
+            ShipCargoType cargoType;
+            if (_activeImportCount < _activeExportCount)
+                cargoType = ShipCargoType.ImportGas;
+            else if (_activeExportCount < _activeImportCount)
+                cargoType = ShipCargoType.ExportProducts;
+            else
+                cargoType = _shipConfig.GetRandomCargoType();
+
             float cargo = cargoType == ShipCargoType.ExportProducts
                 ? _shipConfig.GetRandomExportAmount()
                 : _shipConfig.GetRandomCargo();
             Vector3 spawnPos = _spawnConfig.GetSpawnPosition();
             Vector3 idlePos = _spawnConfig.GetIdlePosition();
-            Vector3 departure = _spawnConfig.GetDepartureTarget(spawnPos.y);
+            Vector3 departure = _spawnConfig.GetDepartureTarget(spawnPos.z);
 
             ship.Initialise(
                 shipId: shipId,
@@ -158,7 +172,11 @@ namespace PetroCitySimulator.Managers
             _activeShips[shipId] = ship;
             _idleShipIds.Add(shipId);
 
+            if (cargoType == ShipCargoType.ExportProducts) _activeExportCount++;
+            else _activeImportCount++;
+
             Debug.Log($"[ShipSpawnManager] Spawned ship {shipId} ({cargoType}) | cargo: {cargo:F1} | " +
+                      $"Import:{_activeImportCount} Export:{_activeExportCount} | " +
                       $"pool in use: {_pool.InUseCount}/{_pool.TotalCount}");
         }
 
@@ -200,9 +218,13 @@ namespace PetroCitySimulator.Managers
 
             if (_activeShips.TryGetValue(e.ShipId, out ShipController ship))
             {
+                if (ship.CargoType == ShipCargoType.ExportProducts) _activeExportCount--;
+                else _activeImportCount--;
+
                 _activeShips.Remove(e.ShipId);
                 _pool.Return(ship);
                 Debug.Log($"[ShipSpawnManager] Ship {e.ShipId} returned to pool. " +
+                          $"Import:{_activeImportCount} Export:{_activeExportCount} | " +
                           $"Pool available: {_pool.AvailableCount}");
             }
             else
@@ -243,6 +265,8 @@ namespace PetroCitySimulator.Managers
             _pool.ReturnAll();
             _activeShips.Clear();
             _idleShipIds.Clear();
+            _activeImportCount = 0;
+            _activeExportCount = 0;
             _spawnTimer = 0f;
             _elapsedPlayTime = 0f;
             _nextShipId = 1;
@@ -259,6 +283,22 @@ namespace PetroCitySimulator.Managers
 
         /// <summary>Current number of ships in the idle waiting zone.</summary>
         public int IdleShipCount => _idleShipIds.Count;
+
+        /// <summary>Returns a snapshot of idle export ships that can be auto-docked.</summary>
+        public List<ShipController> GetIdleExportShips()
+        {
+            var result = new List<ShipController>();
+            foreach (int id in _idleShipIds)
+            {
+                if (_activeShips.TryGetValue(id, out ShipController ship)
+                    && ship.CargoType == ShipCargoType.ExportProducts
+                    && ship.CurrentState == ShipState.Idle)
+                {
+                    result.Add(ship);
+                }
+            }
+            return result;
+        }
 
         // ---------------------------------------------------
         //  Validation
@@ -286,13 +326,13 @@ namespace PetroCitySimulator.Managers
             // Spawn zone — blue
             Gizmos.color = new Color(0.2f, 0.5f, 1f, 0.25f);
             Vector3 spawnCenter = new Vector3(
-                (_spawnConfig.SpawnZoneXMin + _spawnConfig.SpawnZoneXMax) * 0.5f,
-                _spawnConfig.SpawnZoneY, 
-                _spawnConfig.SeaLaneZ);
+                _spawnConfig.SpawnZoneCenter.x,
+                _spawnConfig.ZoneWorldY,
+                _spawnConfig.SpawnZoneCenter.y);
             Vector3 spawnSize = new Vector3(
-                _spawnConfig.SpawnZoneXMax - _spawnConfig.SpawnZoneXMin, 
+                _spawnConfig.SpawnZoneSize.x,
                 1f, 
-                _spawnConfig.SeaLaneZVariance * 2f);
+                _spawnConfig.SpawnZoneSize.y);
             Gizmos.DrawCube(spawnCenter, spawnSize);
             Gizmos.color = new Color(0.2f, 0.5f, 1f, 0.8f);
             Gizmos.DrawWireCube(spawnCenter, spawnSize);
@@ -300,13 +340,13 @@ namespace PetroCitySimulator.Managers
             // Idle zone — green
             Gizmos.color = new Color(0.2f, 0.9f, 0.3f, 0.25f);
             Vector3 idleCenter = new Vector3(
-                (_spawnConfig.IdleZoneXMin + _spawnConfig.IdleZoneXMax) * 0.5f,
-                _spawnConfig.SpawnZoneY, 
-                _spawnConfig.SeaLaneZ);
+                _spawnConfig.IdleZoneCenter.x,
+                _spawnConfig.ZoneWorldY,
+                _spawnConfig.IdleZoneCenter.y);
             Vector3 idleSize = new Vector3(
-                _spawnConfig.IdleZoneXMax - _spawnConfig.IdleZoneXMin, 
+                _spawnConfig.IdleZoneSize.x,
                 1f, 
-                _spawnConfig.IdleZoneZVariance * 2f);
+                _spawnConfig.IdleZoneSize.y);
             Gizmos.DrawCube(idleCenter, idleSize);
             Gizmos.color = new Color(0.2f, 0.9f, 0.3f, 0.8f);
             Gizmos.DrawWireCube(idleCenter, idleSize);
@@ -314,7 +354,7 @@ namespace PetroCitySimulator.Managers
             // Departure point — cyan
             Gizmos.color = Color.cyan;
             Gizmos.DrawWireSphere(
-                new Vector3(_spawnConfig.DepartureX, _spawnConfig.SpawnZoneY, 0f), 0.4f);
+                new Vector3(_spawnConfig.DepartureX, _spawnConfig.ZoneWorldY, _spawnConfig.SpawnZoneCenter.y), 0.4f);
 
             // Labels
             UnityEditor.Handles.Label(spawnCenter + Vector3.up * 0.6f, "Spawn zone");

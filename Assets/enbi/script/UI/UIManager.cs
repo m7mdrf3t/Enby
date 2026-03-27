@@ -3,7 +3,7 @@
 //  Owns all HUD panel references and reacts to game state
 //  changes (show/hide panels, trigger overlays).
 //  Individual HUD components (StorageBarUI, TimerUI, etc.)
-//  manage their own event subscriptions — UIManager only
+//  manage their own event subscriptions ï¿½ UIManager only
 //  handles top-level panel visibility and screen transitions.
 //
 //  Pattern : Facade (single entry point for UI state)
@@ -12,15 +12,14 @@
 
 using UnityEngine;
 using UnityEngine.UI;
+using PetroCitySimulator.Data;
 using PetroCitySimulator.Events;
+using PetroCitySimulator.Managers;
 
 namespace PetroCitySimulator.UI
 {
     public class UIManager : MonoBehaviour
     {
-        // ---------------------------------------------------
-        //  Inspector — Panel roots
-        // ---------------------------------------------------
 
         [Header("Panels")]
         [SerializeField] private GameObject _hudPanel;
@@ -39,6 +38,17 @@ namespace PetroCitySimulator.UI
         [SerializeField] private StorageBarUI _storageBarUI;
         [SerializeField] private CityLightUI _cityStatusUI;
 
+        [Header("Action Buttons")]
+        [Tooltip("Button: sends gas from storage â†’ factory.")]
+        [SerializeField] private Button _factoryButton;
+
+        [Tooltip("Button: sends gas from storage â†’ city.")]
+        [SerializeField] private Button _cityButton;
+
+        [Header("Action Config")]
+        [SerializeField] private FactoryConfigSO _factoryConfig;
+        [SerializeField] private CityConfigSO _cityConfig;
+
         // ---------------------------------------------------
         //  Runtime
         // ---------------------------------------------------
@@ -54,6 +64,14 @@ namespace PetroCitySimulator.UI
             EventBus<OnGameStateChanged>.Subscribe(HandleGameStateChanged);
             EventBus<OnCityBlackout>.Subscribe(HandleCityBlackout);
             EventBus<OnCityLightsRestored>.Subscribe(HandleCityRestored);
+            EventBus<OnStorageChanged>.Subscribe(HandleStorageChangedForButtons);
+            EventBus<OnCityGasChanged>.Subscribe(HandleCityGasChangedForButtons);
+            EventBus<OnFactoryStateChanged>.Subscribe(HandleFactoryStateChangedForButtons);
+
+            if (_factoryButton != null)
+                _factoryButton.onClick.AddListener(OnFactoryButtonPressed);
+            if (_cityButton != null)
+                _cityButton.onClick.AddListener(OnCityButtonPressed);
         }
 
         private void OnDisable()
@@ -61,11 +79,20 @@ namespace PetroCitySimulator.UI
             EventBus<OnGameStateChanged>.Unsubscribe(HandleGameStateChanged);
             EventBus<OnCityBlackout>.Unsubscribe(HandleCityBlackout);
             EventBus<OnCityLightsRestored>.Unsubscribe(HandleCityRestored);
+            EventBus<OnStorageChanged>.Unsubscribe(HandleStorageChangedForButtons);
+            EventBus<OnCityGasChanged>.Unsubscribe(HandleCityGasChangedForButtons);
+            EventBus<OnFactoryStateChanged>.Unsubscribe(HandleFactoryStateChangedForButtons);
+
+            if (_factoryButton != null)
+                _factoryButton.onClick.RemoveListener(OnFactoryButtonPressed);
+            if (_cityButton != null)
+                _cityButton.onClick.RemoveListener(OnCityButtonPressed);
         }
 
         private void Start()
         {
-            ShowPanel(GameState.MainMenu);
+            var gm = Core.GameManager.Instance;
+            ShowPanel(gm != null ? gm.CurrentState : GameState.MainMenu);
 
             if (_blackoutOverlay != null)
             {
@@ -73,6 +100,8 @@ namespace PetroCitySimulator.UI
                 _blackoutOverlay.interactable = false;
                 _blackoutOverlay.blocksRaycasts = false;
             }
+
+            UpdateActionButtons();
         }
 
         // ---------------------------------------------------
@@ -147,5 +176,69 @@ namespace PetroCitySimulator.UI
         public void OnPauseButtonPressed() => Core.GameManager.Instance.PauseGame();
         public void OnResumeButtonPressed() => Core.GameManager.Instance.ResumeGame();
         public void OnQuitButtonPressed() => Core.GameManager.Instance.EndGame();
+
+        // ---------------------------------------------------
+        //  Action buttons â€” Factory & City
+        // ---------------------------------------------------
+
+        public void OnFactoryButtonPressed()
+        {
+            if (StorageManager.Instance == null || FactoryManager.Instance == null) return;
+            if (FactoryManager.Instance.IsBufferFull || StorageManager.Instance.IsEmpty) return;
+
+            float transferAmount = _factoryConfig != null ? _factoryConfig.GasTransferPerPress : 50f;
+            float drained = StorageManager.Instance.TransferGasOut(transferAmount);
+            if (drained > 0f)
+                FactoryManager.Instance.AddGas(drained);
+        }
+
+        public void OnCityButtonPressed()
+        {
+            if (StorageManager.Instance == null || CityManager.Instance == null) return;
+            if (CityManager.Instance.IsFull || StorageManager.Instance.IsEmpty) return;
+
+            float transferAmount = _cityConfig != null ? _cityConfig.TransferAmountPerPress : 50f;
+            float drained = StorageManager.Instance.TransferGasOut(transferAmount);
+            if (drained > 0f)
+                CityManager.Instance.AddGas(drained);
+        }
+
+        // ---------------------------------------------------
+        //  Button state management
+        // ---------------------------------------------------
+
+        private void HandleStorageChangedForButtons(OnStorageChanged e)
+        {
+            UpdateActionButtons();
+        }
+
+        private void HandleCityGasChangedForButtons(OnCityGasChanged e)
+        {
+            UpdateActionButtons();
+        }
+
+        private void HandleFactoryStateChangedForButtons(OnFactoryStateChanged e)
+        {
+            UpdateActionButtons();
+        }
+
+        private void UpdateActionButtons()
+        {
+            bool storageHasGas = StorageManager.Instance != null && !StorageManager.Instance.IsEmpty;
+
+            if (_factoryButton != null)
+            {
+                bool factoryCanAccept = FactoryManager.Instance != null && !FactoryManager.Instance.IsBufferFull;
+                _factoryButton.interactable = storageHasGas && factoryCanAccept;
+                Debug.Log($"[UIManager] Factory Button Interactable: {_factoryButton.interactable} (StorageHasGas: {storageHasGas}, FactoryCanAccept: {factoryCanAccept})");
+            }
+
+            if (_cityButton != null)
+            {
+                bool cityCanAccept = CityManager.Instance != null && !CityManager.Instance.IsFull;
+                _cityButton.interactable = storageHasGas && cityCanAccept;
+                Debug.Log($"[UIManager] City Button Interactable: {_cityButton.interactable} (StorageHasGas: {storageHasGas}, CityCanAccept: {cityCanAccept})");
+            }
+        }
     }
 }

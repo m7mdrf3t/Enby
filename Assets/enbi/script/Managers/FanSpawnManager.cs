@@ -80,7 +80,7 @@ namespace PetroCitySimulator.Managers
 
             if (_activeFans.Count >= _fanConfig.MaxActiveFans)
             {
-                Debug.Log($"[FanSpawnManager] Max active fans reached ({_activeFans.Count}/{_fanConfig.MaxActiveFans})");
+               // Debug.Log($"[FanSpawnManager] Max active fans reached ({_activeFans.Count}/{_fanConfig.MaxActiveFans})");
                 return;
             }
 

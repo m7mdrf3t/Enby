@@ -75,18 +75,24 @@ namespace PetroCitySimulator.Managers
             });
         }
 
-        private void HandleExportRequested(OnProductExportRequested e)
+        public float ExportProducts(int shipId, int socketIndex, float requestedAmount)
         {
-            float exported = TakeProducts(e.RequestedAmount);
+            float exported = TakeProducts(requestedAmount);
 
             EventBus<OnProductsExported>.Raise(new OnProductsExported
             {
-                ShipId = e.ShipId,
-                SocketIndex = e.SocketIndex,
+                ShipId = shipId,
+                SocketIndex = socketIndex,
                 AmountExported = exported
             });
 
-            Debug.Log($"[ProductStorageManager] Ship {e.ShipId} exported {exported:F1}/{e.RequestedAmount:F1} products.");
+            Debug.Log($"[ProductStorageManager] Ship {shipId} exported {exported:F1}/{requestedAmount:F1} products.");
+            return exported;
+        }
+
+        private void HandleExportRequested(OnProductExportRequested e)
+        {
+            ExportProducts(e.ShipId, e.SocketIndex, e.RequestedAmount);
         }
 
         private void OnDestroy()

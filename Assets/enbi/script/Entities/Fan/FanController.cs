@@ -59,16 +59,14 @@ namespace PetroCitySimulator.Entities.Fan
         private Timer _loadTimer;
         private Timer _unloadTimer;
         private Timer _cooldownTimer;
-        private float _currentStorageAmount;
         private float _loadedAmount;
         private Vector3 _homePosition;
-        private Vector3[] _toStoragePath = System.Array.Empty<Vector3>();
-        private Vector3[] _toTownPath = System.Array.Empty<Vector3>();
+        private Vector3[] _toPickupPath = System.Array.Empty<Vector3>();
+        private Vector3[] _toDropoffPath = System.Array.Empty<Vector3>();
         private Vector3[] _returnPath = System.Array.Empty<Vector3>();
         private readonly List<Vector3> _activePath = new List<Vector3>();
         private int _activePathIndex;
         private bool _routeReserved;
-        private FanRouteTarget _currentRouteTarget = FanRouteTarget.Town;
 
         // ---------------------------------------------------
         //  Public read-only
@@ -98,13 +96,11 @@ namespace PetroCitySimulator.Entities.Fan
 
         private void OnEnable()
         {
-            EventBus<OnStorageChanged>.Subscribe(HandleStorageChanged);
             EventBus<OnGameStateChanged>.Subscribe(HandleGameStateChanged);
         }
 
         private void OnDisable()
         {
-            EventBus<OnStorageChanged>.Unsubscribe(HandleStorageChanged);
             EventBus<OnGameStateChanged>.Unsubscribe(HandleGameStateChanged);
         }
 
@@ -117,8 +113,11 @@ namespace PetroCitySimulator.Entities.Fan
             _cooldownTimer.Tick(Time.deltaTime);
 
             UpdateMovement();
-
             UpdateBladeRotation();
+
+            // Auto-dispatch: activate when idle and factory has products
+            if (_fsm.IsTappable && FactoryManager.Instance != null && FactoryManager.Instance.HasProducts)
+                TryActivate();
         }
 
         public void Initialise(int fanId, Vector3 homePosition, FanConfigSO config = null)
@@ -129,8 +128,8 @@ namespace PetroCitySimulator.Entities.Fan
             _homePosition = homePosition;
             _loadedAmount = 0f;
             _routeReserved = false;
-            _toStoragePath = System.Array.Empty<Vector3>();
-            _toTownPath = System.Array.Empty<Vector3>();
+            _toPickupPath = System.Array.Empty<Vector3>();
+            _toDropoffPath = System.Array.Empty<Vector3>();
             _returnPath = System.Array.Empty<Vector3>();
             _activePath.Clear();
             _activePathIndex = 0;
@@ -150,25 +149,12 @@ namespace PetroCitySimulator.Entities.Fan
         /// </summary>
         public bool TryActivate()
         {
-            return TryActivate(FanRouteTarget.Town);
-        }
-
-        public bool TryActivateToFactory()
-        {
-            return TryActivate(FanRouteTarget.Factory);
-        }
-
-        private bool TryActivate(FanRouteTarget target)
-        {
             if (!_fsm.IsTappable)
-            {
-                Debug.Log($"[FanController {_fanId}] Tap ignored — state is {_fsm.Current}.");
                 return false;
-            }
 
-            if (_currentStorageAmount < _config.MinimumStorageThreshold)
+            if (FactoryManager.Instance == null || !FactoryManager.Instance.HasProducts)
             {
-                Debug.Log($"[FanController {_fanId}] Tap ignored — storage below minimum threshold ({_currentStorageAmount:F1} < {_config.MinimumStorageThreshold:F1}).");
+                Debug.Log($"[FanController {_fanId}] No products at factory.");
                 return false;
             }
 
@@ -178,13 +164,11 @@ namespace PetroCitySimulator.Entities.Fan
                 return false;
             }
 
-            if (!FanRouteManager.Instance.TryBeginRoute(this, target, out _toStoragePath, out _toTownPath, out _returnPath))
+            if (!FanRouteManager.Instance.TryBeginRoute(this, out _toPickupPath, out _toDropoffPath, out _returnPath))
             {
                 Debug.Log($"[FanController {_fanId}] Route is busy or not configured.");
                 return false;
             }
-
-            _currentRouteTarget = target;
 
             ActivateRoute();
             return true;
@@ -199,16 +183,15 @@ namespace PetroCitySimulator.Entities.Fan
             _routeReserved = true;
             _loadedAmount = 0f;
             _fsm.TransitionTo(FanState.MovingToStorage);
-            SetActivePath(_toStoragePath);
+            SetActivePath(_toPickupPath);
 
             EventBus<OnFanActivated>.Raise(new OnFanActivated
             {
                 FanId = _fanId,
-                TransferAmount = _config.TransferAmount,
-                RouteTarget = _currentRouteTarget
+                TransferAmount = _config.TransferAmount
             });
 
-            Debug.Log($"[FanController {_fanId}] Route started.");
+            Debug.Log($"[FanController {_fanId}] Product delivery route started.");
         }
 
         // ---------------------------------------------------
@@ -220,62 +203,37 @@ namespace PetroCitySimulator.Entities.Fan
             if (FanRouteManager.Instance != null)
                 FanRouteManager.Instance.EndStorageLoad(this);
 
-            _loadedAmount = StorageManager.Instance != null
-                ? StorageManager.Instance.DrainGas(_config.TransferAmount)
+            _loadedAmount = FactoryManager.Instance != null
+                ? FactoryManager.Instance.TakeProducts(_config.TransferAmount)
                 : 0f;
-
-            EventBus<OnFanTransferRequested>.Raise(new OnFanTransferRequested
-            {
-                FanId = _fanId,
-                TransferAmount = _loadedAmount
-            });
 
             PlayParticles(false);
             _fsm.TransitionTo(FanState.MovingToTown);
-            SetActivePath(_toTownPath);
-            
-            // Add to town queue so it can unload when it arrives
-            if (FanRouteManager.Instance != null)
-            {
-                if (_currentRouteTarget == FanRouteTarget.Factory)
-                    FanRouteManager.Instance.EnqueueForFactoryUnload(this);
-                else
-                    FanRouteManager.Instance.EnqueueForTownUnload(this);
-            }
+            SetActivePath(_toDropoffPath);
 
-            Debug.Log($"[FanController {_fanId}] Loaded {_loadedAmount:F1} units.");
+            if (FanRouteManager.Instance != null)
+                FanRouteManager.Instance.EnqueueForTownUnload(this);
+
+            Debug.Log($"[FanController {_fanId}] Loaded {_loadedAmount:F1} product units from factory.");
         }
 
         private void HandleUnloadComplete()
         {
             if (FanRouteManager.Instance != null)
-            {
-                if (_currentRouteTarget == FanRouteTarget.Factory)
-                    FanRouteManager.Instance.EndFactoryUnload(this);
-                else
-                    FanRouteManager.Instance.EndTownUnload(this);
-            }
+                FanRouteManager.Instance.EndTownUnload(this);
 
-            if (_currentRouteTarget == FanRouteTarget.Factory)
-            {
-                EventBus<OnFactoryGasDelivered>.Raise(new OnFactoryGasDelivered
-                {
-                    FactoryId = 1,
-                    FanId = _fanId,
-                    GasAmount = _loadedAmount
-                });
-            }
+            if (ProductStorageManager.Instance != null && _loadedAmount > 0f)
+                ProductStorageManager.Instance.AddProducts(_loadedAmount);
 
             EventBus<OnFanCompleted>.Raise(new OnFanCompleted
             {
                 FanId = _fanId,
-                AmountTransferred = _loadedAmount,
-                RouteTarget = _currentRouteTarget
+                AmountTransferred = _loadedAmount
             });
 
             _fsm.TransitionTo(FanState.Returning);
             SetActiveReturnPath();
-            Debug.Log($"[FanController {_fanId}] Unloaded {_loadedAmount:F1} units at town.");
+            Debug.Log($"[FanController {_fanId}] Delivered {_loadedAmount:F1} products to storage.");
         }
 
         private void HandleCooldownComplete()
@@ -290,28 +248,6 @@ namespace PetroCitySimulator.Entities.Fan
         // ---------------------------------------------------
         //  Event handlers
         // ---------------------------------------------------
-
-        private void HandleStorageChanged(OnStorageChanged e)
-        {
-            _currentStorageAmount = e.CurrentAmount;
-
-            bool storageTooLow = e.CurrentAmount < _config.MinimumStorageThreshold;
-
-            switch (_fsm.Current)
-            {
-                case FanState.Idle when storageTooLow:
-                    _fsm.TransitionTo(FanState.Disabled);
-                    break;
-
-                case FanState.Cooldown when storageTooLow:
-                    _fsm.TransitionTo(FanState.Disabled);
-                    break;
-
-                case FanState.Disabled when !storageTooLow:
-                    _fsm.TransitionTo(FanState.Idle);
-                    break;
-            }
-        }
 
         private void HandleGameStateChanged(OnGameStateChanged e)
         {
@@ -418,30 +354,18 @@ namespace PetroCitySimulator.Entities.Fan
 
         private void UpdateUnloadingState()
         {
-            // Check if timer is already running (we're unloading)
             if (_unloadTimer.IsRunning)
                 return;
 
-            // Timer not running — check if we can start unloading
-            bool canBeginUnload = false;
-            if (FanRouteManager.Instance != null)
-            {
-                canBeginUnload = _currentRouteTarget == FanRouteTarget.Factory
-                    ? FanRouteManager.Instance.TryBeginFactoryUnload(this)
-                    : FanRouteManager.Instance.TryBeginTownUnload(this);
-            }
+            bool canBeginUnload = FanRouteManager.Instance != null
+                && FanRouteManager.Instance.TryBeginTownUnload(this);
 
             if (canBeginUnload)
             {
                 PlayParticles(true);
                 _unloadTimer.Start();
-                Debug.Log($"[FanController {_fanId}] Starting unload at {_currentRouteTarget}...");
+                Debug.Log($"[FanController {_fanId}] Starting unload at product storage...");
             }
-            else if (FanRouteManager.Instance != null)
-            {
-                Debug.Log($"[FanController {_fanId}] Waiting at {_currentRouteTarget} (another fan unloading)...");
-            }
-            // else: still waiting, will try again next frame
         }
 
         private void MoveAlongPath(float speed, FanState nextState, System.Action onArrive)

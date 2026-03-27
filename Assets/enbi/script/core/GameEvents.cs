@@ -207,6 +207,21 @@ namespace PetroCitySimulator.Events
 
 
     // ----------------------------------------------------------
+    //  FACTORY EVENTS
+    // ----------------------------------------------------------
+
+    /// <summary>
+    /// Raised by FactoryManager whenever the gas buffer or product output changes.
+    /// </summary>
+    public struct OnFactoryStateChanged
+    {
+        public float GasBuffer;
+        public float GasBufferCapacity;
+        public float GasBufferFillRatio;
+        public float ProductOutputBuffer;
+    }
+
+    // ----------------------------------------------------------
     //  FAN EVENTS
     // ----------------------------------------------------------
 
@@ -218,11 +233,8 @@ namespace PetroCitySimulator.Events
     {
         public int FanId;
 
-        /// <summary>Gas units that will be transferred by this fan activation.</summary>
+        /// <summary>Product units that will be transferred by this fan activation.</summary>
         public float TransferAmount;
-
-        /// <summary>Where this fan route is heading after loading.</summary>
-        public Managers.FanRouteTarget RouteTarget;
     }
 
     /// <summary>
@@ -233,21 +245,9 @@ namespace PetroCitySimulator.Events
     {
         public int FanId;
         public float AmountTransferred;
-
-        /// <summary>Where this fan route unloaded.</summary>
-        public Managers.FanRouteTarget RouteTarget;
     }
 
-    /// <summary>
-    /// Raised when a factory receives gas input from a fan.
-    /// FactoryManager listens and converts this into production.
-    /// </summary>
-    public struct OnFactoryGasDelivered
-    {
-        public int FactoryId;
-        public int FanId;
-        public float GasAmount;
-    }
+
 
 
     // ----------------------------------------------------------
@@ -293,30 +293,22 @@ namespace PetroCitySimulator.Events
         public Entities.Ship.ShipController ShipController;
     }
 
-    /// <summary>
-    /// Raised by InputManager when a factory is tapped.
-    /// FactoryManager listens and requests a fan dispatch.
-    /// </summary>
-    public struct OnFactoryTapped
-    {
-        public int FactoryId;
-    }
 
-    /// <summary>
-    /// Raised by FanController the moment a fan is activated.
-    /// StorageManager listens and immediately drains the requested amount.
-    /// Separate from OnFanActivated so storage deduction is synchronous
-    /// while the visual transfer animation plays asynchronously.
-    /// </summary>
-    public struct OnFanTransferRequested
-    {
-        public int FanId;
-        public float TransferAmount;
-    }
 
     // ----------------------------------------------------------
     //  PRODUCT / ECONOMY EVENTS
     // ----------------------------------------------------------
+
+    /// <summary>
+    /// Raised whenever the city’s internal gas buffer changes.
+    /// CityLightUI subscribes to this for health bar / blackout visuals.
+    /// </summary>
+    public struct OnCityGasChanged
+    {
+        public float CurrentAmount;
+        public float MaxCapacity;
+        public float FillRatio;
+    }
 
     /// <summary>
     /// Raised whenever product storage amount changes.

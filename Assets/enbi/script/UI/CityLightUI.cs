@@ -56,7 +56,7 @@ namespace PetroCitySimulator.UI
 
         private void OnEnable()
         {
-            EventBus<OnStorageChanged>.Subscribe(HandleStorageChanged);
+            EventBus<OnCityGasChanged>.Subscribe(HandleCityGasChanged);
             EventBus<OnCityBlackout>.Subscribe(HandleCityBlackout);
             EventBus<OnCityLightsRestored>.Subscribe(HandleCityRestored);
             EventBus<OnCityConsumptionTick>.Subscribe(HandleConsumptionTick);
@@ -64,7 +64,7 @@ namespace PetroCitySimulator.UI
 
         private void OnDisable()
         {
-            EventBus<OnStorageChanged>.Unsubscribe(HandleStorageChanged);
+            EventBus<OnCityGasChanged>.Unsubscribe(HandleCityGasChanged);
             EventBus<OnCityBlackout>.Unsubscribe(HandleCityBlackout);
             EventBus<OnCityLightsRestored>.Unsubscribe(HandleCityRestored);
             EventBus<OnCityConsumptionTick>.Unsubscribe(HandleConsumptionTick);
@@ -86,7 +86,7 @@ namespace PetroCitySimulator.UI
         //  Event handlers
         // ---------------------------------------------------
 
-        private void HandleStorageChanged(OnStorageChanged e)
+        private void HandleCityGasChanged(OnCityGasChanged e)
         {
             _healthBarTarget = e.FillRatio;
             UpdateHealthBarColour(e.FillRatio);

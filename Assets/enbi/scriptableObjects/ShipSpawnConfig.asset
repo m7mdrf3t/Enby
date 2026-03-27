@@ -14,16 +14,14 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _poolInitialSize: 6
   _poolMaxSize: 12
-  _initialSpawnInterval: 12
-  _minimumSpawnInterval: 4
+  _initialSpawnInterval: 2
+  _minimumSpawnInterval: 2
   _maxDifficultyTime: 180
   _spawnIntervalJitter: 1.5
-  _spawnZoneXMin: -26.1
-  _spawnZoneXMax: -19.1
-  _seaLaneZ: 5.5
-  _seaLaneZVariance: 4.19
-  _idleZoneXMin: -15.5
-  _idleZoneXMax: -7.47
-  _idleZoneZVariance: 7.38
+  _spawnZoneCenter: {x: 156.9, y: 1503}
+  _spawnZoneSize: {x: 411.8, y: 338.5}
+  _idleZoneCenter: {x: -97.6, y: 953}
+  _idleZoneSize: {x: 739.3, y: 541.7}
+  _zoneWorldY: 0
   _departureX: -9.9
-  _maxIdleShips: 3
+  _maxIdleShips: 5

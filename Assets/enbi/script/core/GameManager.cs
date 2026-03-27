@@ -80,9 +80,10 @@ namespace PetroCitySimulator.Core
             EventBusUtil.Register(EventBus<OnCityConsumptionTick>.Clear);
             EventBusUtil.Register(EventBus<OnFanActivated>.Clear);
             EventBusUtil.Register(EventBus<OnFanCompleted>.Clear);
-            EventBusUtil.Register(EventBus<OnFanTransferRequested>.Clear);
+
             EventBusUtil.Register(EventBus<OnShipTapped>.Clear);
             EventBusUtil.Register(EventBus<OnGameStateChanged>.Clear);
+            EventBusUtil.Register(EventBus<OnCityGasChanged>.Clear);
 
             Debug.Log("[GameManager] Initialised. Awaiting StartGame().");
         }

@@ -13,6 +13,7 @@
 
 using System.Collections.Generic;
 using UnityEngine;
+using PetroCitySimulator.Data;
 using PetroCitySimulator.Events;
 using PetroCitySimulator.Entities.Ship;
 using PetroCitySimulator.Entities.Socket;
@@ -24,6 +25,13 @@ namespace PetroCitySimulator.Managers
         // ---------------------------------------------------
         //  Inspector
         // ---------------------------------------------------
+
+        [Header("Config")]
+        [SerializeField] private EconomyConfigSO _economyConfig;
+
+        [Header("References")]
+        [Tooltip("ShipSpawnManager for querying idle export ships.")]
+        [SerializeField] private ShipSpawnManager _shipSpawnManager;
 
         [Header("Sockets")]
         [Tooltip("All SocketControllers in the scene, in order. Drag them in here.")]
@@ -88,9 +96,22 @@ namespace PetroCitySimulator.Managers
         //  Core event handlers
         // ---------------------------------------------------
 
+        private void Update()
+        {
+            if (!Core.GameManager.Instance.IsPlaying) return;
+            TryAutoDockExportShips();
+        }
+
         private void HandleShipTapped(OnShipTapped e)
         {
             if (!Core.GameManager.Instance.IsPlaying) return;
+
+            // Export ships dock automatically — ignore player taps
+            if (e.ShipController.CargoType == ShipCargoType.ExportProducts)
+            {
+                Debug.Log($"[ShoreManager] Ship {e.ShipId} is export — tap ignored (auto-docks).");
+                return;
+            }
 
             // Guard: is this ship already assigned?
             if (_shipToSocket.ContainsKey(e.ShipId))
@@ -99,14 +120,25 @@ namespace PetroCitySimulator.Managers
                 return;
             }
 
+            // Money gate for import ships
+            float cost = _economyConfig != null ? _economyConfig.DockingCostPerShip : 0f;
+            if (cost > 0f && MoneyManager.Instance != null && !MoneyManager.Instance.CanAfford(cost))
+            {
+                Debug.Log($"[ShoreManager] Not enough money to dock ship {e.ShipId} (need {cost:F1}, have {MoneyManager.Instance.CurrentMoney:F1}).");
+                return;
+            }
+
             // Find a compatible free socket
             var socket = GetFirstAvailableSocketFor(e.ShipController.CargoType);
             if (socket == null)
             {
                 Debug.Log($"[ShoreManager] No compatible free socket for ship {e.ShipId} ({e.ShipController.CargoType}) — tap ignored.");
-                // TODO: Play a "busy" feedback sound/animation here
                 return;
             }
+
+            // Deduct money
+            if (cost > 0f && MoneyManager.Instance != null)
+                MoneyManager.Instance.SpendMoney(cost, "ShipDocking");
 
             // Lock the socket immediately so no other tap can steal it
             socket.AssignIncomingShip(e.ShipController);
@@ -115,7 +147,37 @@ namespace PetroCitySimulator.Managers
             // Tell the ship to start moving
             e.ShipController.BeginDocking(socket.SocketIndex, socket.WorldPosition);
 
-            Debug.Log($"[ShoreManager] Ship {e.ShipId} → Socket {socket.SocketIndex}.");
+            Debug.Log($"[ShoreManager] Ship {e.ShipId} → Socket {socket.SocketIndex} (cost: {cost:F1}).");
+        }
+
+        /// <summary>
+        /// Every frame, try to auto-assign idle export ships to free sockets.
+        /// </summary>
+        private void TryAutoDockExportShips()
+        {
+            if (_shipSpawnManager == null) return;
+
+            // Only dock export ships when there are products to collect.
+            if (ProductStorageManager.Instance == null || ProductStorageManager.Instance.CurrentAmount <= 0f)
+                return;
+
+            var idleExports = _shipSpawnManager.GetIdleExportShips();
+            if (idleExports == null || idleExports.Count == 0) return;
+
+            for (int i = idleExports.Count - 1; i >= 0; i--)
+            {
+                var ship = idleExports[i];
+                if (ship == null || _shipToSocket.ContainsKey(ship.ShipId)) continue;
+
+                var socket = GetFirstAvailableSocketFor(ShipCargoType.ExportProducts);
+                if (socket == null) break; // no free export sockets left
+
+                socket.AssignIncomingShip(ship);
+                _shipToSocket[ship.ShipId] = socket.SocketIndex;
+                ship.BeginDocking(socket.SocketIndex, socket.WorldPosition);
+
+                Debug.Log($"[ShoreManager] Auto-docking export ship {ship.ShipId} → Socket {socket.SocketIndex}.");
+            }
         }
 
         private void HandleShipDespawned(OnShipDespawned e)

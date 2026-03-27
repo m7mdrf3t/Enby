@@ -8,6 +8,8 @@ namespace PetroCitySimulator.Managers
 {
     public class FactoryManager : MonoBehaviour
     {
+        public static FactoryManager Instance { get; private set; }
+
         [Header("Identity")]
         [SerializeField] private int _factoryId = 1;
 
@@ -16,9 +18,23 @@ namespace PetroCitySimulator.Managers
 
         private Timer _productionTimer;
         private float _gasBuffer;
+        private float _productOutputBuffer;
+
+        public float GasBuffer => _gasBuffer;
+        public float GasBufferCapacity => _config != null ? _config.GasBufferCapacity : 0f;
+        public bool IsBufferFull => _config != null && _gasBuffer >= _config.GasBufferCapacity;
+        public float ProductOutputBuffer => _productOutputBuffer;
+        public bool HasProducts => _productOutputBuffer > 0f;
 
         private void Awake()
         {
+            if (Instance != null && Instance != this)
+            {
+                Destroy(gameObject);
+                return;
+            }
+            Instance = this;
+
             if (_config == null)
             {
                 Debug.LogError("[FactoryManager] FactoryConfigSO is not assigned.");
@@ -31,15 +47,11 @@ namespace PetroCitySimulator.Managers
 
         private void OnEnable()
         {
-            EventBus<OnFactoryTapped>.Subscribe(HandleFactoryTapped);
-            EventBus<OnFactoryGasDelivered>.Subscribe(HandleFactoryGasDelivered);
             EventBus<OnGameStateChanged>.Subscribe(HandleGameStateChanged);
         }
 
         private void OnDisable()
         {
-            EventBus<OnFactoryTapped>.Unsubscribe(HandleFactoryTapped);
-            EventBus<OnFactoryGasDelivered>.Unsubscribe(HandleFactoryGasDelivered);
             EventBus<OnGameStateChanged>.Unsubscribe(HandleGameStateChanged);
         }
 
@@ -48,9 +60,7 @@ namespace PetroCitySimulator.Managers
             if (!Core.GameManager.Instance.IsPlaying) return;
             if (_productionTimer == null) return;
 
-            bool canProduce = _gasBuffer >= _config.GasPerProduct &&
-                              ProductStorageManager.Instance != null &&
-                              !ProductStorageManager.Instance.IsFull;
+            bool canProduce = _gasBuffer >= _config.GasPerProduct;
 
             if (canProduce && !_productionTimer.IsRunning)
                 _productionTimer.Start();
@@ -58,28 +68,45 @@ namespace PetroCitySimulator.Managers
             _productionTimer.Tick(Time.deltaTime);
         }
 
-        private void HandleFactoryTapped(OnFactoryTapped e)
+        /// <summary>
+        /// Add gas to the factory buffer (called by Factory UI Button).
+        /// Returns the actual amount added (clamped to capacity).
+        /// </summary>
+        public float AddGas(float amount)
         {
-            if (e.FactoryId != _factoryId) return;
-            TryDispatchIdleFanToFactory();
+            if (_config == null || amount <= 0f) return 0f;
+
+            float space = _config.GasBufferCapacity - _gasBuffer;
+            float added = Mathf.Min(amount, space);
+            _gasBuffer += added;
+            Debug.Log($"[FactoryManager] +{added:F1} gas from button. Buffer: {_gasBuffer:F1}/{_config.GasBufferCapacity:F1}");
+            PublishStateChanged();
+            return added;
         }
 
-        private void HandleFactoryGasDelivered(OnFactoryGasDelivered e)
+        /// <summary>
+        /// Fans pick up products from this output buffer.
+        /// Returns the actual amount taken.
+        /// </summary>
+        public float TakeProducts(float amount)
         {
-            if (e.FactoryId != _factoryId) return;
-            _gasBuffer += Mathf.Max(0f, e.GasAmount);
-            Debug.Log($"[FactoryManager] Received gas from fan {e.FanId}: +{e.GasAmount:F1}. Buffer: {_gasBuffer:F1}");
+            if (amount <= 0f || _productOutputBuffer <= 0f) return 0f;
+            float taken = Mathf.Min(amount, _productOutputBuffer);
+            _productOutputBuffer -= taken;
+            Debug.Log($"[FactoryManager] Fan took {taken:F1} products. Output buffer: {_productOutputBuffer:F1}");
+            PublishStateChanged();
+            return taken;
         }
 
         private void HandleProductionCycleComplete()
         {
-            if (ProductStorageManager.Instance == null) return;
             if (_gasBuffer < _config.GasPerProduct) return;
 
             _gasBuffer -= _config.GasPerProduct;
-            float produced = ProductStorageManager.Instance.AddProducts(_config.ProductsPerCycle);
+            _productOutputBuffer += _config.ProductsPerCycle;
 
-            Debug.Log($"[FactoryManager] Produced {produced:F1} product(s). Gas buffer: {_gasBuffer:F1}");
+            Debug.Log($"[FactoryManager] Produced {_config.ProductsPerCycle:F1} product(s). Gas buffer: {_gasBuffer:F1}, Product output: {_productOutputBuffer:F1}");
+            PublishStateChanged();
         }
 
         private void HandleGameStateChanged(OnGameStateChanged e)
@@ -94,33 +121,27 @@ namespace PetroCitySimulator.Managers
             {
                 _productionTimer.Stop();
                 _gasBuffer = 0f;
+                _productOutputBuffer = 0f;
+                PublishStateChanged();
             }
         }
 
-        private void TryDispatchIdleFanToFactory()
+        private void PublishStateChanged()
         {
-            FanController[] fans = FindObjectsByType<FanController>(FindObjectsSortMode.None);
-            if (fans == null || fans.Length == 0)
+            float capacity = _config != null ? _config.GasBufferCapacity : 0f;
+            EventBus<OnFactoryStateChanged>.Raise(new OnFactoryStateChanged
             {
-                Debug.Log("[FactoryManager] No fans found to dispatch.");
-                return;
-            }
+                GasBuffer = _gasBuffer,
+                GasBufferCapacity = capacity,
+                GasBufferFillRatio = capacity > 0f ? _gasBuffer / capacity : 0f,
+                ProductOutputBuffer = _productOutputBuffer
+            });
+        }
 
-            for (int i = 0; i < fans.Length; i++)
-            {
-                FanController fan = fans[i];
-                if (fan != null && fan.IsTappable)
-                {
-                    bool sent = fan.TryActivateToFactory();
-                    if (sent)
-                    {
-                        Debug.Log($"[FactoryManager] Dispatched fan {fan.FanId} to factory.");
-                        return;
-                    }
-                }
-            }
-
-            Debug.Log("[FactoryManager] No eligible idle fan available for factory dispatch.");
+        private void OnDestroy()
+        {
+            if (Instance == this)
+                Instance = null;
         }
     }
 }

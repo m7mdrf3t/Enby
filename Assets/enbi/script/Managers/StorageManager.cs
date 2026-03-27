@@ -34,20 +34,12 @@ namespace PetroCitySimulator.Managers
         [Tooltip("Starting gas level as a fraction of max capacity (0�1).")]
         [SerializeField, Range(0f, 1f)] private float _startFillRatio = 0.5f;
 
-        [Header("Consumption")]
-        [Tooltip("Gas units drained per second by the city when running normally.")]
-        [SerializeField] private float _baseConsumptionRate = 5f;
-
-        [Tooltip("How often (seconds) the consumption tick fires and publishes events.")]
-        [SerializeField] private float _consumptionTickInterval = 1f;
-
         // ---------------------------------------------------
         //  Runtime state
         // ---------------------------------------------------
 
         private float _currentAmount;
         private bool _isEmpty;
-        private float _consumptionTimer;
 
         // ---------------------------------------------------
         //  Public read-only accessors
@@ -80,16 +72,12 @@ namespace PetroCitySimulator.Managers
         private void OnEnable()
         {
             EventBus<OnCargoDelivered>.Subscribe(HandleCargoDelivered);
-            EventBus<OnFanCompleted>.Subscribe(HandleFanCompleted);
-            EventBus<OnFanTransferRequested>.Subscribe(HandleFanTransferRequested);
             EventBus<OnGameStateChanged>.Subscribe(HandleGameStateChanged);
         }
 
         private void OnDisable()
         {
             EventBus<OnCargoDelivered>.Unsubscribe(HandleCargoDelivered);
-            EventBus<OnFanCompleted>.Unsubscribe(HandleFanCompleted);
-            EventBus<OnFanTransferRequested>.Unsubscribe(HandleFanTransferRequested);
             EventBus<OnGameStateChanged>.Unsubscribe(HandleGameStateChanged);
         }
 
@@ -97,29 +85,6 @@ namespace PetroCitySimulator.Managers
         {
             // Broadcast initial state so all UIs can initialise correctly
             PublishStorageChanged(justBecameEmpty: false, justBecameFull: false);
-        }
-
-        private void Update()
-        {
-            if (!Core.GameManager.Instance.IsPlaying) return;
-
-            TickConsumption();
-        }
-
-        // ---------------------------------------------------
-        //  Consumption tick
-        // ---------------------------------------------------
-
-        private void TickConsumption()
-        {
-            _consumptionTimer += Time.deltaTime;
-
-            if (_consumptionTimer < _consumptionTickInterval) return;
-
-            _consumptionTimer -= _consumptionTickInterval;
-
-            float drain = _baseConsumptionRate * _consumptionTickInterval;
-            DrainGas(drain, isConsumptionTick: true);
         }
 
         // ---------------------------------------------------
@@ -180,16 +145,16 @@ namespace PetroCitySimulator.Managers
 
             PublishStorageChanged(justBecameEmpty: justBecameEmpty, justBecameFull: false);
 
-            if (isConsumptionTick)
-            {
-                EventBus<OnCityConsumptionTick>.Raise(new OnCityConsumptionTick
-                {
-                    AmountConsumed = actualDrain,
-                    ConsumptionRate = _baseConsumptionRate
-                });
-            }
-
             return actualDrain;
+        }
+
+        /// <summary>
+        /// Transfer gas out of storage for use by City or Factory buttons.
+        /// Returns the actual amount drained (clamped to available).
+        /// </summary>
+        public float TransferGasOut(float amount)
+        {
+            return DrainGas(amount);
         }
 
         // ---------------------------------------------------
@@ -202,25 +167,9 @@ namespace PetroCitySimulator.Managers
             AddGas(e.AmountDelivered);
         }
 
-        private void HandleFanCompleted(OnFanCompleted e)
-        {
-            // Fan already transferred gas directly; this is for any
-            // secondary book-keeping if needed later.
-            Debug.Log($"[StorageManager] Fan {e.FanId} transfer acknowledged: {e.AmountTransferred:F1} units.");
-        }
-
-        private void HandleFanTransferRequested(OnFanTransferRequested e)
-        {
-            // FanController already drains storage at load completion and
-            // reports the actual loaded amount through this event.
-            Debug.Log($"[StorageManager] Fan {e.FanId} transfer acknowledged: {e.TransferAmount:F1} units.");
-        }
-
         private void HandleGameStateChanged(OnGameStateChanged e)
         {
-            // Reset consumption timer on pause/resume to avoid a spike
-            if (e.NewState == GameState.Paused || e.NewState == GameState.Playing)
-                _consumptionTimer = 0f;
+            // No per-frame consumption — city manages its own buffer now.
         }
 
         // ---------------------------------------------------
@@ -245,8 +194,6 @@ namespace PetroCitySimulator.Managers
 
             _maxCapacity = _config.MaxCapacity;
             _startFillRatio = _config.StartFillRatio;
-            _baseConsumptionRate = _config.BaseConsumptionRate;
-            _consumptionTickInterval = _config.ConsumptionTickInterval;
         }
 
         // ---------------------------------------------------

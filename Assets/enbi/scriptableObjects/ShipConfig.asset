@@ -14,16 +14,16 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _minCargoAmount: 80
   _maxCargoAmount: 200
-  _exportShipChance: 0.5
+  _exportShipChance: 0.63
   _minExportAmount: 40
   _maxExportAmount: 120
   _forceExportShips: 0
   _forceImportShips: 0
-  _dockDuration: 3
+  _dockDuration: 1
   _dockSnapDistance: 0.5
-  _dockingSpeed: 2
-  _departureSpeed: 3
-  _idleSpeed: 1
-  _despawnDistance: 4
+  _dockingSpeed: 100
+  _departureSpeed: 30
+  _idleSpeed: 80
+  _despawnDistance: 40
   _idleBobAmplitude: 0.15
   _idleBobFrequency: 0.8
