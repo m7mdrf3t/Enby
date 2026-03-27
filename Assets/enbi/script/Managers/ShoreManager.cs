@@ -92,6 +92,21 @@ namespace PetroCitySimulator.Managers
             return socket != null ? socket.WorldPosition : Vector3.zero;
         }
 
+        public bool TryProcessNextExportAction()
+        {
+            foreach (var socket in _sockets)
+            {
+                if (socket != null && socket.IsAwaitingManualExport && socket.TryProcessManualExport())
+                {
+                    Debug.Log($"[ShoreManager] Manual export processed at socket {socket.SocketIndex}.");
+                    return true;
+                }
+            }
+
+            Debug.Log("[ShoreManager] Manual export action pressed, but no export ship is waiting.");
+            return false;
+        }
+
         // ---------------------------------------------------
         //  Core event handlers
         // ---------------------------------------------------
@@ -145,7 +160,7 @@ namespace PetroCitySimulator.Managers
             _shipToSocket[e.ShipId] = socket.SocketIndex;
 
             // Tell the ship to start moving
-            e.ShipController.BeginDocking(socket.SocketIndex, socket.WorldPosition);
+            e.ShipController.BeginDocking(socket.SocketIndex, socket.WorldPosition, socket.WorldRotation);
 
             Debug.Log($"[ShoreManager] Ship {e.ShipId} → Socket {socket.SocketIndex} (cost: {cost:F1}).");
         }
@@ -156,10 +171,6 @@ namespace PetroCitySimulator.Managers
         private void TryAutoDockExportShips()
         {
             if (_shipSpawnManager == null) return;
-
-            // Only dock export ships when there are products to collect.
-            if (ProductStorageManager.Instance == null || ProductStorageManager.Instance.CurrentAmount <= 0f)
-                return;
 
             var idleExports = _shipSpawnManager.GetIdleExportShips();
             if (idleExports == null || idleExports.Count == 0) return;
@@ -174,7 +185,7 @@ namespace PetroCitySimulator.Managers
 
                 socket.AssignIncomingShip(ship);
                 _shipToSocket[ship.ShipId] = socket.SocketIndex;
-                ship.BeginDocking(socket.SocketIndex, socket.WorldPosition);
+                ship.BeginDocking(socket.SocketIndex, socket.WorldPosition, socket.WorldRotation);
 
                 Debug.Log($"[ShoreManager] Auto-docking export ship {ship.ShipId} → Socket {socket.SocketIndex}.");
             }

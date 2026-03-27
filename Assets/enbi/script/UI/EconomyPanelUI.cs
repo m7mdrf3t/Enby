@@ -18,6 +18,10 @@ namespace PetroCitySimulator.UI
         [Tooltip("Shows only the current product count as a plain number.")]
         [SerializeField] private TMP_Text _productCountLabel;
 
+        [Header("City Gas")]
+        [SerializeField] private Image _cityGasFill;
+        [SerializeField] private TMP_Text _cityGasAmountLabel;
+
         [Header("Money")]
         [SerializeField] private TMP_Text _moneyLabel;
         [SerializeField] private TMP_Text _moneyDeltaLabel;
@@ -32,6 +36,7 @@ namespace PetroCitySimulator.UI
         {
             EventBus<OnFactoryStateChanged>.Subscribe(HandleFactoryStateChanged);
             EventBus<OnProductStorageChanged>.Subscribe(HandleProductStorageChanged);
+            EventBus<OnCityGasChanged>.Subscribe(HandleCityGasChanged);
             EventBus<OnMoneyChanged>.Subscribe(HandleMoneyChanged);
         }
 
@@ -39,6 +44,7 @@ namespace PetroCitySimulator.UI
         {
             EventBus<OnFactoryStateChanged>.Unsubscribe(HandleFactoryStateChanged);
             EventBus<OnProductStorageChanged>.Unsubscribe(HandleProductStorageChanged);
+            EventBus<OnCityGasChanged>.Unsubscribe(HandleCityGasChanged);
             EventBus<OnMoneyChanged>.Unsubscribe(HandleMoneyChanged);
         }
 
@@ -74,6 +80,15 @@ namespace PetroCitySimulator.UI
 
             if (_productCountLabel != null)
                 _productCountLabel.text = $"{e.CurrentAmount:F0}";
+        }
+
+        private void HandleCityGasChanged(OnCityGasChanged e)
+        {
+            if (_cityGasFill != null)
+                _cityGasFill.fillAmount = e.FillRatio;
+
+            if (_cityGasAmountLabel != null)
+                _cityGasAmountLabel.text = $"{e.CurrentAmount:F0} / {e.MaxCapacity:F0}";
         }
 
         private void HandleMoneyChanged(OnMoneyChanged e)

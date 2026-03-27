@@ -221,6 +221,29 @@ namespace PetroCitySimulator.Events
         public float ProductOutputBuffer;
     }
 
+    /// <summary>
+    /// Raised when a factory upgrade is unlocked and becomes available to purchase.
+    /// UI can use this to enable/show the upgrade button.
+    /// </summary>
+    public struct OnFactoryUpgradeUnlocked
+    {
+        public int CurrentLevel;
+        public int NextLevel;
+        public float UpgradeCost;
+    }
+
+    /// <summary>
+    /// Raised when the player successfully upgrades the factory.
+    /// Level increased, stats changed, visual model updated.
+    /// </summary>
+    public struct OnFactoryUpgraded
+    {
+        public int NewLevel;
+        public float GasPerProduct;
+        public float ProductsPerCycle;
+        public float ProductionDuration;
+    }
+
     // ----------------------------------------------------------
     //  FAN EVENTS
     // ----------------------------------------------------------
@@ -262,6 +285,28 @@ namespace PetroCitySimulator.Events
     {
         public GameState PreviousState;
         public GameState NewState;
+    }
+
+    /// <summary>
+    /// Raised by GameManager while the main match timer is running.
+    /// UI can use this for countdown labels and radial fills.
+    /// </summary>
+    public struct OnMainTimerTick
+    {
+        public float RemainingSeconds;
+        public float DurationSeconds;
+        public float NormalizedRemaining;
+    }
+
+    /// <summary>
+    /// Raised once when the match ends so final-screen UI can display
+    /// end-of-round totals even if managers reset on GameOver.
+    /// </summary>
+    public struct OnGameFinishedSummary
+    {
+        public float MoneyAmount;
+        public float ProductAmount;
+        public float GasAmount;
     }
 
     /// <summary>

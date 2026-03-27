@@ -44,6 +44,17 @@ namespace PetroCitySimulator.Entities.Ship
         [Header("Config — assign ShipConfigSO asset")]
         [SerializeField] private ShipConfigSO _config;
 
+        [Header("Docking Rotation")]
+        [Tooltip("How quickly the ship rotates to match socket heading while docking (deg/sec).")]
+        [SerializeField, Min(0f)] private float _dockRotationSpeed = 220f;
+
+        [Header("Departure Visibility")]
+        [Tooltip("Minimum seconds the ship stays visible after departure begins.")]
+        [SerializeField, Min(0f)] private float _minDepartureVisibleTime = 1.5f;
+
+        [Tooltip("Minimum distance from departure start before ship can be despawned.")]
+        [SerializeField, Min(0f)] private float _minDepartureVisibleDistance = 6f;
+
         // ---------------------------------------------------
         //  Runtime data (set by ShipSpawnManager on Get())
         // ---------------------------------------------------
@@ -54,7 +65,10 @@ namespace PetroCitySimulator.Entities.Ship
 
         private int _assignedSocketIndex = -1;
         private Vector3 _socketWorldPosition;
+        private Quaternion _socketWorldRotation;
         private Vector3 _departureTarget;
+        private Vector3 _departureStartPosition;
+        private float _departureElapsed;
         private Vector3 _idleAnchor;          // world position to bob around
 
         // ---------------------------------------------------
@@ -144,6 +158,9 @@ namespace PetroCitySimulator.Entities.Ship
             _originalVisualY = _visualRoot.localPosition.y;
 
             _assignedSocketIndex = -1;
+            _socketWorldRotation = transform.rotation;
+            _departureStartPosition = spawnPosition;
+            _departureElapsed = 0f;
 
             UpdateRoleVisual();
 
@@ -165,7 +182,7 @@ namespace PetroCitySimulator.Entities.Ship
         /// Called by ShoreManager when the player's tap is validated.
         /// Starts the ship moving toward the socket.
         /// </summary>
-        public void BeginDocking(int socketIndex, Vector3 socketWorldPosition)
+        public void BeginDocking(int socketIndex, Vector3 socketWorldPosition, Quaternion socketWorldRotation)
         {
             if (!_fsm.IsTappable)
             {
@@ -175,6 +192,7 @@ namespace PetroCitySimulator.Entities.Ship
 
             _assignedSocketIndex = socketIndex;
             _socketWorldPosition = socketWorldPosition;
+            _socketWorldRotation = socketWorldRotation;
 
             _fsm.TransitionTo(ShipState.Docking);
 
@@ -198,6 +216,8 @@ namespace PetroCitySimulator.Entities.Ship
             }
 
             _fsm.TransitionTo(ShipState.Departing);
+            _departureStartPosition = transform.position;
+            _departureElapsed = 0f;
 
             EventBus<OnShipDeparting>.Raise(new OnShipDeparting
             {
@@ -235,11 +255,16 @@ namespace PetroCitySimulator.Entities.Ship
         {
             // Glide toward socket
             MoveToward(_socketWorldPosition, _config.DockingSpeed);
+            transform.rotation = Quaternion.RotateTowards(
+                transform.rotation,
+                _socketWorldRotation,
+                _dockRotationSpeed * Time.deltaTime);
 
             if (Vector3.Distance(transform.position, _socketWorldPosition) < _config.DockSnapDistance)
             {
                 // Snap precisely and notify socket
                 transform.position = _socketWorldPosition;
+                transform.rotation = _socketWorldRotation;
                 ResetVisualBob();
 
                 _fsm.TransitionTo(ShipState.Docked);
@@ -257,11 +282,19 @@ namespace PetroCitySimulator.Entities.Ship
 
         private void UpdateDeparting()
         {
+            _departureElapsed += Time.deltaTime;
             MoveToward(_departureTarget, _config.DepartureSpeed);
 
-            float dist = Vector3.Distance(transform.position, _departureTarget);
-            if (dist < _config.DockSnapDistance ||
-                Vector3.Distance(transform.position, _idleAnchor) > _config.DespawnDistance)
+            float distToTarget = Vector3.Distance(transform.position, _departureTarget);
+            float movedSinceDeparture = Vector3.Distance(transform.position, _departureStartPosition);
+
+            bool metVisibilityTime = _departureElapsed >= _minDepartureVisibleTime;
+            bool metVisibilityDistance = movedSinceDeparture >= _minDepartureVisibleDistance;
+
+            bool reachedTarget = distToTarget < _config.DockSnapDistance;
+            bool exceededDespawnDistance = movedSinceDeparture > _config.DespawnDistance;
+
+            if (metVisibilityTime && metVisibilityDistance && (reachedTarget || exceededDespawnDistance))
             {
                 Despawn();
             }

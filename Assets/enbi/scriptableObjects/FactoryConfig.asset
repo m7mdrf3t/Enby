@@ -14,6 +14,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _productionDuration: 5
   _gasPerProduct: 25
-  _productsPerCycle: 2
+  _productsPerCycle: 10
   _gasBufferCapacity: 200
   _gasTransferPerPress: 50

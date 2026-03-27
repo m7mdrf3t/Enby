@@ -22,7 +22,7 @@ MonoBehaviour:
   _dockDuration: 1
   _dockSnapDistance: 0.5
   _dockingSpeed: 100
-  _departureSpeed: 30
+  _departureSpeed: 200
   _idleSpeed: 80
   _despawnDistance: 40
   _idleBobAmplitude: 0.15

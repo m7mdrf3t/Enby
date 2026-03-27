@@ -18,10 +18,10 @@ MonoBehaviour:
   _minimumSpawnInterval: 2
   _maxDifficultyTime: 180
   _spawnIntervalJitter: 1.5
-  _spawnZoneCenter: {x: 156.9, y: 1503}
-  _spawnZoneSize: {x: 411.8, y: 338.5}
-  _idleZoneCenter: {x: -97.6, y: 953}
-  _idleZoneSize: {x: 739.3, y: 541.7}
+  _spawnZoneCenter: {x: -43.9, y: 1503}
+  _spawnZoneSize: {x: 890.7, y: 369}
+  _idleZoneCenter: {x: -109, y: 1155}
+  _idleZoneSize: {x: 613.7, y: 293}
   _zoneWorldY: 0
   _departureX: -9.9
   _maxIdleShips: 5

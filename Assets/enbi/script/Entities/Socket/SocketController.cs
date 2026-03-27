@@ -67,6 +67,7 @@ namespace PetroCitySimulator.Entities.Socket
         private Timer _cooldownTimer;
         private ShipController _dockedShip;
         private float _assignedCargo;
+        private bool _awaitingManualExport;
 
         // ---------------------------------------------------
         //  Public read-only
@@ -77,6 +78,8 @@ namespace PetroCitySimulator.Entities.Socket
         public bool IsAvailable => _fsm != null && _fsm.IsAvailable;
         public SocketCargoMode CargoMode => _cargoMode;
         public Vector3 WorldPosition => transform.position;
+        public Quaternion WorldRotation => transform.rotation;
+        public bool IsAwaitingManualExport => _awaitingManualExport;
 
         // ---------------------------------------------------
         //  Unity lifecycle
@@ -167,8 +170,33 @@ namespace PetroCitySimulator.Entities.Socket
             _cooldownTimer.Stop();
             _dockedShip = null;
             _assignedCargo = 0f;
+            _awaitingManualExport = false;
             _fsm.Reset();
             UpdateStatusColor();
+        }
+
+        public bool TryProcessManualExport()
+        {
+            if (!_awaitingManualExport || _dockedShip == null || _dockedShip.CargoType != ShipCargoType.ExportProducts)
+                return false;
+
+            if (ProductStorageManager.Instance == null)
+            {
+                Debug.LogWarning($"[SocketController {_socketIndex}] Cannot process export: ProductStorageManager is missing.");
+                return false;
+            }
+
+            if (ProductStorageManager.Instance.CurrentAmount <= 0f)
+            {
+                Debug.LogWarning($"[SocketController {_socketIndex}] Cannot process export: product storage is empty.");
+                return false;
+            }
+
+            ProductStorageManager.Instance.ExportProducts(_dockedShip.ShipId, _socketIndex, _assignedCargo);
+            Debug.Log($"[SocketController {_socketIndex}] Manual export processed: {_assignedCargo:F1} requested units.");
+
+            BeginShipDepartureAndReleaseSocket();
+            return true;
         }
 
         // ---------------------------------------------------
@@ -218,23 +246,9 @@ namespace PetroCitySimulator.Entities.Socket
 
             if (_dockedShip.CargoType == ShipCargoType.ExportProducts)
             {
-                if (ProductStorageManager.Instance != null)
-                {
-                    ProductStorageManager.Instance.ExportProducts(_dockedShip.ShipId, _socketIndex, _assignedCargo);
-                    Debug.Log($"[SocketController {_socketIndex}] Export processed: {_assignedCargo:F1} requested units.");
-                }
-                else
-                {
-                    // Fallback to event-driven export path if manager lookup fails.
-                    EventBus<OnProductExportRequested>.Raise(new OnProductExportRequested
-                    {
-                        ShipId = _dockedShip.ShipId,
-                        SocketIndex = _socketIndex,
-                        RequestedAmount = _assignedCargo
-                    });
-
-                    Debug.LogWarning($"[SocketController {_socketIndex}] ProductStorageManager missing, raised export request event instead.");
-                }
+                _awaitingManualExport = true;
+                Debug.Log($"[SocketController {_socketIndex}] Export ship ready. Waiting for manual export action.");
+                return;
             }
             else
             {
@@ -249,11 +263,18 @@ namespace PetroCitySimulator.Entities.Socket
                 Debug.Log($"[SocketController {_socketIndex}] Cargo delivered: {_assignedCargo:F1} units.");
             }
 
-            // 2. Tell the ship to depart
+            BeginShipDepartureAndReleaseSocket();
+        }
+
+        private void BeginShipDepartureAndReleaseSocket()
+        {
+            // 1. Tell the ship to depart
             _dockedShip.BeginDeparture();
             _dockedShip = null;
+            _assignedCargo = 0f;
+            _awaitingManualExport = false;
 
-            // 3. Transition socket state
+            // 2. Transition socket state
             if (_enableCooldown)
             {
                 _fsm.TransitionTo(SocketState.Cooldown);
@@ -287,6 +308,7 @@ namespace PetroCitySimulator.Entities.Socket
         private void FreeSocket()
         {
             _assignedCargo = 0f;
+            _awaitingManualExport = false;
             _fsm.TransitionTo(SocketState.Free);
 
             EventBus<OnSocketFreed>.Raise(new OnSocketFreed

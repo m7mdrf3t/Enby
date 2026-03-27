@@ -76,6 +76,9 @@ MonoBehaviour:
   _importLabelColor: {r: 0.65, g: 0.9, b: 1, a: 1}
   _exportLabelColor: {r: 1, g: 0.85, b: 0.45, a: 1}
   _config: {fileID: 11400000, guid: 50d1138b2b577eb44b86cd840249a44e, type: 2}
+  _dockRotationSpeed: 220
+  _minDepartureVisibleTime: 1.5
+  _minDepartureVisibleDistance: 6
 --- !u!1 &3993307600163694587
 GameObject:
   m_ObjectHideFlags: 0
@@ -110,7 +113,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: -86.236, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -1.8451766, y: 132}
+  m_AnchoredPosition: {x: -1.8451766, y: 152.2}
   m_SizeDelta: {x: 291.194, y: 65.6157}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!23 &6600478119526408023
@@ -205,8 +208,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 566.1
-  m_fontSizeBase: 566.1
+  m_fontSize: 214.4
+  m_fontSizeBase: 214.4
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18

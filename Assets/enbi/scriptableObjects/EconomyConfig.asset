@@ -12,5 +12,5 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0a0e55396ce4047409e4bcc5f7d0f94c, type: 3}
   m_Name: EconomyConfig
   m_EditorClassIdentifier: 
-  _moneyPerProductUnit: 10
-  _dockingCostPerShip: 10
+  _moneyPerProductUnit: 100
+  _dockingCostPerShip: 30

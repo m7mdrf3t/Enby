@@ -10,13 +10,15 @@
 
 using UnityEngine;
 using PetroCitySimulator.Events;
+using PetroCitySimulator.Managers;
 
 namespace PetroCitySimulator.Core
 {
     public class GameManager : MonoBehaviour
     {
-        [Header("Startup")]
-        [SerializeField] private bool _autoStartInPlayMode = true;
+        [Header("Main Timer")]
+        [Tooltip("Total match time in seconds. When it reaches zero, the game ends.")]
+        [SerializeField, Min(1f)] private float _matchDurationSeconds = 180f;
 
         // ---------------------------------------------------
         //  Singleton
@@ -41,8 +43,7 @@ namespace PetroCitySimulator.Core
 
         private void Start()
         {
-            if (_autoStartInPlayMode && _currentState == GameState.MainMenu)
-                StartGame();
+            // Keep MainMenu active until the player presses Start.
         }
 
         // ---------------------------------------------------
@@ -50,11 +51,14 @@ namespace PetroCitySimulator.Core
         // ---------------------------------------------------
 
         private GameState _currentState = GameState.MainMenu;
+        private float _mainTimerRemaining;
 
         public GameState CurrentState => _currentState;
 
         public bool IsPlaying => _currentState == GameState.Playing;
         public bool IsPaused => _currentState == GameState.Paused;
+        public float MatchDurationSeconds => _matchDurationSeconds;
+        public float MainTimerRemaining => _mainTimerRemaining;
 
         // ---------------------------------------------------
         //  Initialisation
@@ -84,6 +88,10 @@ namespace PetroCitySimulator.Core
             EventBusUtil.Register(EventBus<OnShipTapped>.Clear);
             EventBusUtil.Register(EventBus<OnGameStateChanged>.Clear);
             EventBusUtil.Register(EventBus<OnCityGasChanged>.Clear);
+            EventBusUtil.Register(EventBus<OnMainTimerTick>.Clear);
+            EventBusUtil.Register(EventBus<OnGameFinishedSummary>.Clear);
+            EventBusUtil.Register(EventBus<OnFactoryUpgradeUnlocked>.Clear);
+            EventBusUtil.Register(EventBus<OnFactoryUpgraded>.Clear);
 
             Debug.Log("[GameManager] Initialised. Awaiting StartGame().");
         }
@@ -100,6 +108,9 @@ namespace PetroCitySimulator.Core
                 Debug.LogWarning("[GameManager] StartGame called in wrong state.");
                 return;
             }
+
+            _mainTimerRemaining = _matchDurationSeconds;
+            PublishMainTimerTick();
             TransitionTo(GameState.Playing);
         }
 
@@ -123,7 +134,23 @@ namespace PetroCitySimulator.Core
         public void EndGame()
         {
             Time.timeScale = 1f;
+            PublishGameFinishedSummary();
             TransitionTo(GameState.GameOver);
+        }
+
+        private void Update()
+        {
+            if (_currentState != GameState.Playing)
+                return;
+
+            if (_mainTimerRemaining <= 0f)
+                return;
+
+            _mainTimerRemaining = Mathf.Max(0f, _mainTimerRemaining - Time.deltaTime);
+            PublishMainTimerTick();
+
+            if (_mainTimerRemaining <= 0f)
+                EndGame();
         }
 
         // ---------------------------------------------------
@@ -142,6 +169,27 @@ namespace PetroCitySimulator.Core
             });
 
             Debug.Log($"[GameManager] {previousState} → {newState}");
+        }
+
+        private void PublishMainTimerTick()
+        {
+            float duration = Mathf.Max(0.01f, _matchDurationSeconds);
+            EventBus<OnMainTimerTick>.Raise(new OnMainTimerTick
+            {
+                RemainingSeconds = _mainTimerRemaining,
+                DurationSeconds = _matchDurationSeconds,
+                NormalizedRemaining = Mathf.Clamp01(_mainTimerRemaining / duration)
+            });
+        }
+
+        private void PublishGameFinishedSummary()
+        {
+            EventBus<OnGameFinishedSummary>.Raise(new OnGameFinishedSummary
+            {
+                MoneyAmount = MoneyManager.Instance != null ? MoneyManager.Instance.CurrentMoney : 0f,
+                ProductAmount = ProductStorageManager.Instance != null ? ProductStorageManager.Instance.CurrentAmount : 0f,
+                GasAmount = CityManager.Instance != null ? CityManager.Instance.CurrentGas : 0f
+            });
         }
 
         // ---------------------------------------------------

@@ -12,6 +12,8 @@
 
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.SceneManagement;
+using TMPro;
 using PetroCitySimulator.Data;
 using PetroCitySimulator.Events;
 using PetroCitySimulator.Managers;
@@ -37,6 +39,15 @@ namespace PetroCitySimulator.UI
         [Header("HUD Components")]
         [SerializeField] private StorageBarUI _storageBarUI;
         [SerializeField] private CityLightUI _cityStatusUI;
+
+        [Header("Main Timer HUD")]
+        [SerializeField] private TMP_Text _mainTimerLabel;
+        [SerializeField] private Image _mainTimerFill;
+
+        [Header("Final Screen Stats")]
+        [SerializeField] private TMP_Text _finalMoneyLabel;
+        [SerializeField] private TMP_Text _finalProductLabel;
+        [SerializeField] private TMP_Text _finalGasLabel;
 
         [Header("Action Buttons")]
         [Tooltip("Button: sends gas from storage → factory.")]
@@ -67,6 +78,8 @@ namespace PetroCitySimulator.UI
             EventBus<OnStorageChanged>.Subscribe(HandleStorageChangedForButtons);
             EventBus<OnCityGasChanged>.Subscribe(HandleCityGasChangedForButtons);
             EventBus<OnFactoryStateChanged>.Subscribe(HandleFactoryStateChangedForButtons);
+            EventBus<OnMainTimerTick>.Subscribe(HandleMainTimerTick);
+            EventBus<OnGameFinishedSummary>.Subscribe(HandleGameFinishedSummary);
 
             if (_factoryButton != null)
                 _factoryButton.onClick.AddListener(OnFactoryButtonPressed);
@@ -82,6 +95,8 @@ namespace PetroCitySimulator.UI
             EventBus<OnStorageChanged>.Unsubscribe(HandleStorageChangedForButtons);
             EventBus<OnCityGasChanged>.Unsubscribe(HandleCityGasChangedForButtons);
             EventBus<OnFactoryStateChanged>.Unsubscribe(HandleFactoryStateChangedForButtons);
+            EventBus<OnMainTimerTick>.Unsubscribe(HandleMainTimerTick);
+            EventBus<OnGameFinishedSummary>.Unsubscribe(HandleGameFinishedSummary);
 
             if (_factoryButton != null)
                 _factoryButton.onClick.RemoveListener(OnFactoryButtonPressed);
@@ -102,6 +117,9 @@ namespace PetroCitySimulator.UI
             }
 
             UpdateActionButtons();
+
+            if (_mainTimerFill != null)
+                _mainTimerFill.fillAmount = 1f;
         }
 
         // ---------------------------------------------------
@@ -119,6 +137,40 @@ namespace PetroCitySimulator.UI
             SetActive(_hudPanel, state == GameState.Playing || state == GameState.Paused);
             SetActive(_pausePanel, state == GameState.Paused);
             SetActive(_gameOverPanel, state == GameState.GameOver);
+
+            if (state == GameState.MainMenu || state == GameState.Playing)
+                RefreshFinalSummaryFromManagers();
+        }
+
+        private void HandleMainTimerTick(OnMainTimerTick e)
+        {
+            if (_mainTimerLabel != null)
+                _mainTimerLabel.text = FormatTime(e.RemainingSeconds);
+
+            if (_mainTimerFill != null)
+                _mainTimerFill.fillAmount = e.NormalizedRemaining;
+        }
+
+        private void HandleGameFinishedSummary(OnGameFinishedSummary e)
+        {
+            if (_finalMoneyLabel != null)
+                _finalMoneyLabel.text = $"Money: {e.MoneyAmount:F0}";
+
+            if (_finalProductLabel != null)
+                _finalProductLabel.text = $"Products: {e.ProductAmount:F0}";
+
+            if (_finalGasLabel != null)
+                _finalGasLabel.text = $"Gas: {e.GasAmount:F0}";
+        }
+
+        private void RefreshFinalSummaryFromManagers()
+        {
+            HandleGameFinishedSummary(new OnGameFinishedSummary
+            {
+                MoneyAmount = MoneyManager.Instance != null ? MoneyManager.Instance.CurrentMoney : 0f,
+                ProductAmount = ProductStorageManager.Instance != null ? ProductStorageManager.Instance.CurrentAmount : 0f,
+                GasAmount = CityManager.Instance != null ? CityManager.Instance.CurrentGas : 0f
+            });
         }
 
         // ---------------------------------------------------
@@ -173,6 +225,18 @@ namespace PetroCitySimulator.UI
         // ---------------------------------------------------
 
         public void OnStartButtonPressed() => Core.GameManager.Instance.StartGame();
+
+        public void OnTryAgainButtonPressed()
+        {
+            // Reloading the active scene resets gameplay systems and returns
+            // UI/manager state to startup defaults for a clean retry.
+            Time.timeScale = 1f;
+            SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+        }
+
+        // Inspector-friendly alias for alternate casing/spelling.
+        public void OnTryagainButtonPressed() => OnTryAgainButtonPressed();
+
         public void OnPauseButtonPressed() => Core.GameManager.Instance.PauseGame();
         public void OnResumeButtonPressed() => Core.GameManager.Instance.ResumeGame();
         public void OnQuitButtonPressed() => Core.GameManager.Instance.EndGame();
@@ -239,6 +303,14 @@ namespace PetroCitySimulator.UI
                 _cityButton.interactable = storageHasGas && cityCanAccept;
                 Debug.Log($"[UIManager] City Button Interactable: {_cityButton.interactable} (StorageHasGas: {storageHasGas}, CityCanAccept: {cityCanAccept})");
             }
+        }
+
+        private static string FormatTime(float seconds)
+        {
+            int s = Mathf.CeilToInt(Mathf.Max(0f, seconds));
+            int minutes = s / 60;
+            int remainingSeconds = s % 60;
+            return $"{minutes:00}:{remainingSeconds:00}";
         }
     }
 }
